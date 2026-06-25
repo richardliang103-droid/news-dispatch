@@ -112,8 +112,13 @@ input{font:inherit}
 .row .meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.01em}
 .row.unread .meta{color:var(--muted)}
 .row .rtk{color:var(--ink);font-weight:500;padding-right:2px}
-.row .sep{opacity:.5}
-.chip{font-family:var(--sans);font-size:11px;color:var(--muted);border:1px solid var(--border);padding:1px 7px;border-radius:6px}
+.row .meta .sep{opacity:.5}
+/* ── topic cluster ── */
+.topic-cluster{margin:6px 0 2px;padding:4px 0;border-left:2px solid var(--hair);padding-left:10px}
+.topic-head{display:flex;align-items:baseline;gap:8px;padding:4px 0 6px;font-size:12px}
+.topic-label{color:var(--ink);font-weight:500;font-family:var(--sans)}
+.topic-meta{color:var(--dim);font-family:var(--mono);font-size:10.5px}
+/* ── chip ── */
 .star{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .15s,color .15s,transform .15s}
 .star:hover{background:var(--hover);color:var(--signal)}
 .star svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.3}
@@ -363,7 +368,58 @@ function renderRail(){
   document.getElementById("chipbar").innerHTML = cb;
 }
 
-// ── Row template ──
+// ── 主題聚類（同一天內合併同事件報導） ──
+function getBigrams(text){
+  // 正規化後取所有連續 2 字元組合（用於中文相似度比對）
+  const s = text.replace(/[【《\[].*?[】》\]]/g,"").replace(/\s+/g,"").toLowerCase();
+  const out = [];
+  for(let i=0; i<s.length-1; i++) out.push(s.substring(i,i+2));
+  return out;
+}
+function clusterByTopic(articles){
+  // 貪婪聚類：同一 ticker 內，兩篇文章共享 ≥4 個 bigram → 同主題
+  const byTicker = {};
+  for(const a of articles){
+    if(!byTicker[a.ticker]) byTicker[a.ticker] = [];
+    byTicker[a.ticker].push(a);
+  }
+  const result = []; // [{ticker, topic, rows:[]}]
+  for(const [tk, items] of Object.entries(byTicker)){
+    const used = new Set();
+    for(const a of items){
+      if(used.has(a.id)) continue;
+      const cluster = [a];
+      used.add(a.id);
+      const aBg = getBigrams(a.title);
+      for(const b of items){
+        if(used.has(b.id)) continue;
+        const bBg = getBigrams(b.title);
+        const shared = aBg.filter(x => bBg.includes(x)).length;
+        if(shared >= 4){ cluster.push(b); used.add(b.id); }
+      }
+      // 生成主題標籤：取所有標題中最常出現的連續片段
+      let topic = "";
+      if(cluster.length >= 2){
+        // 找出現最多次的 4-gram 當主題名
+        const freq = {};
+        for(const r of cluster){
+          const s = r.title.replace(/[【《\[].*?[】》\]]/g,"").replace(/\s+/g,"");
+          for(let i=0;i<s.length-3;i++){
+            const ng = s.substring(i,i+4);
+            freq[ng]=(freq[ng]||0)+1;
+          }
+        }
+        let best="",bestN=0;
+        for(const [k,v] of Object.entries(freq)){
+          if(v>bestN||(v===bestN&&k.length<best.length)){best=k;bestN=v;}
+        }
+        topic = best || cluster[0].title.substring(0,12);
+      }
+      result.push({ticker:tk, topic, rows:cluster});
+    }
+  }
+  return result;
+}
 function rowHTML(r){
   const tag = state.sort==="time" ? `<span class="rtk">${TICKER_NAMES[r.ticker]||r.ticker}${r.ticker}</span>` : "";
   return `<article class="row ${r.read?"":"unread"} ${r.starred?"starred":""}" role="button" tabindex="0" data-id="${r.id}">
@@ -406,31 +462,41 @@ function render(){
       </section>`;
     }).join("");
   } else {
-    // 依時間排序：按日期分組
+    // 依時間排序：按日期分組 → 日期內按主題聚類
     const sorted = [...items].sort((a,b)=>b.ts-a.ts);
-    // 日期格式化：2026/6/25(四)
     const weekMap = ["日","一","二","三","四","五","六"];
     const dateLabel = (ts) => {
       const d = new Date(ts);
       return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}(${weekMap[d.getDay()]})`;
     };
-    // 分組
-    const groups = [];
+    // 日期分組
+    const dateGroups = [];
     let curDate = "";
     for(const r of sorted){
       const lbl = dateLabel(r.ts);
-      if(lbl !== curDate){
-        curDate = lbl;
-        groups.push({label: lbl, rows: []});
-      }
-      groups[groups.length-1].rows.push(r);
+      if(lbl !== curDate){ curDate = lbl; dateGroups.push({label:lbl, rows:[]}); }
+      dateGroups[dateGroups.length-1].rows.push(r);
     }
-    wrap.innerHTML = groups.map(g =>
-      `<section class="group">
-        <div class="group-head"><span class="gnm">${g.label}</span><span class="gline"></span><span class="gcount">${g.rows.length} 則</span></div>
-        ${g.rows.map(rowHTML).join("")}
-      </section>`
-    ).join("");
+    // 每個日期內做主題聚類
+    wrap.innerHTML = dateGroups.map(dg => {
+      const clusters = clusterByTopic(dg.rows);
+      const clusterHTML = clusters.map(cl => {
+        if(cl.rows.length === 1){
+          return rowHTML(cl.rows[0]);
+        }
+        // 多篇同主題 → 收攏區塊
+        const nm = TICKER_NAMES[cl.ticker]||cl.ticker;
+        const unread = cl.rows.filter(r=>!r.read).length;
+        return `<div class="topic-cluster">
+          <div class="topic-head"><span class="topic-label">📰 ${esc(cl.topic)}</span><span class="topic-meta">${nm}${cl.ticker} · ${unread}/${cl.rows.length} 則</span></div>
+          ${cl.rows.map(rowHTML).join("")}
+        </div>`;
+      }).join("");
+      return `<section class="group">
+        <div class="group-head"><span class="gnm">${dg.label}</span><span class="gline"></span><span class="gcount">${dg.rows.length} 則</span></div>
+        ${clusterHTML}
+      </section>`;
+    }).join("");
   }
 }
 
