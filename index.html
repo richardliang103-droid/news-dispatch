@@ -299,6 +299,9 @@ async function fetchNews(){
       starred: r.starred || false,
     }));
 
+    // 用 localStorage 覆蓋 read/starred 狀態（當 Supabase 寫入失敗時的備援）
+    applyLocalState();
+
     // 從資料中提取 ticker 列表（按出現順序，去重）
     const seen = new Set();
     TICKERS = [];
@@ -350,6 +353,26 @@ const unreadOf = t => DATA.filter(d=>d.ticker===t && !d.read).length;
 const totalUnread = () => DATA.filter(d=>!d.read).length;
 const totalStar = () => DATA.filter(d=>d.starred).length;
 
+// ── localStorage 本地持久化（Supabase 寫入失敗時的備援） ──
+const LS_READ = "ns-read-ids";
+const LS_STAR = "ns-star-ids";
+function persistReadState(){
+  try { localStorage.setItem(LS_READ, JSON.stringify(DATA.filter(d=>d.read).map(d=>d.id))); } catch(e){}
+}
+function persistStarredState(){
+  try { localStorage.setItem(LS_STAR, JSON.stringify(DATA.filter(d=>d.starred).map(d=>d.id))); } catch(e){}
+}
+function applyLocalState(){
+  try {
+    const raw = localStorage.getItem(LS_READ);
+    if(raw){ const ids=new Set(JSON.parse(raw)); DATA.forEach(d=>{if(ids.has(d.id))d.read=true;}); }
+  } catch(e){}
+  try {
+    const raw = localStorage.getItem(LS_STAR);
+    if(raw){ const ids=new Set(JSON.parse(raw)); DATA.forEach(d=>{if(ids.has(d.id))d.starred=true;}); }
+  } catch(e){}
+}
+
 function matches(r){
   if(state.ticker!=="all" && r.ticker!==state.ticker) return false;
   if(state.view==="unread"  && r.read)     return false;
@@ -385,56 +408,23 @@ function renderRail(){
   document.getElementById("chipbar").innerHTML = cb;
 }
 
-// ── 主題聚類（同一天內合併同事件報導） ──
-function getBigrams(text){
-  // 正規化後取所有連續 2 字元組合（用於中文相似度比對）
-  const s = text.replace(/[【《\[].*?[】》\]]/g,"").replace(/\s+/g,"").toLowerCase();
-  const out = [];
-  for(let i=0; i<s.length-1; i++) out.push(s.substring(i,i+2));
-  return out;
-}
-function clusterByTopic(articles){
-  // 貪婪聚類：同一 ticker 內，兩篇文章共享 ≥4 個 bigram → 同主題
-  const byTicker = {};
+// ── 主題分組（按 theme 欄位，取代原本的 bigram 聚類） ──
+function groupByTheme(articles){
+  const byTheme = {};
   for(const a of articles){
-    if(!byTicker[a.ticker]) byTicker[a.ticker] = [];
-    byTicker[a.ticker].push(a);
+    const th = a.theme || "其他";
+    if(!byTheme[th]) byTheme[th] = [];
+    byTheme[th].push(a);
   }
-  const result = []; // [{ticker, topic, rows:[]}]
-  for(const [tk, items] of Object.entries(byTicker)){
-    const used = new Set();
-    for(const a of items){
-      if(used.has(a.id)) continue;
-      const cluster = [a];
-      used.add(a.id);
-      const aBg = getBigrams(a.title);
-      for(const b of items){
-        if(used.has(b.id)) continue;
-        const bBg = getBigrams(b.title);
-        const shared = aBg.filter(x => bBg.includes(x)).length;
-        if(shared >= 3){ cluster.push(b); used.add(b.id); }
-      }
-      // 生成主題標籤：取所有標題中最常出現的連續片段
-      let topic = "";
-      if(cluster.length >= 2){
-        // 找出現最多次的 4-gram 當主題名
-        const freq = {};
-        for(const r of cluster){
-          const s = r.title.replace(/[【《\[].*?[】》\]]/g,"").replace(/\s+/g,"");
-          for(let i=0;i<s.length-3;i++){
-            const ng = s.substring(i,i+4);
-            freq[ng]=(freq[ng]||0)+1;
-          }
-        }
-        let best="",bestN=0;
-        for(const [k,v] of Object.entries(freq)){
-          if(v>bestN||(v===bestN&&k.length<best.length)){best=k;bestN=v;}
-        }
-        topic = best || cluster[0].title.substring(0,12);
-      }
-      result.push({ticker:tk, topic, rows:cluster});
-    }
+  const result = [];
+  for(const [theme, rows] of Object.entries(byTheme)){
+    // 列出這個主題涉及的所有 ticker 名稱
+    const tickers = [...new Set(rows.map(r=>r.ticker))];
+    const tickerLabels = tickers.map(t => TICKER_NAMES[t] || t).join("、");
+    result.push({topic: theme, rows, tickerString: tickerLabels});
   }
+  // 按新聞數量降序排列（量大的主題在前）
+  result.sort((a,b) => b.rows.length - a.rows.length);
   return result;
 }
 function rowHTML(r){
@@ -498,19 +488,18 @@ function render(){
     wrap.innerHTML = dateGroups.map(dg => {
       const clusters = state.category === "tech" 
         ? dg.rows.map(r => ({ticker:r.ticker, topic:"", rows:[r]}))  // 科技新聞不聚類
-        : clusterByTopic(dg.rows);
+        : groupByTheme(dg.rows);
       const clusterHTML = clusters.map(cl => {
         if(cl.rows.length === 1){
           return rowHTML(cl.rows[0]);
         }
         // 多篇同主題 → 收攏區塊（預設收合）
-        const nm = TICKER_NAMES[cl.ticker]||cl.ticker;
         const unread = cl.rows.filter(r=>!r.read).length;
         return `<div class="topic-cluster collapsed">
           <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
             <span class="toggle">▼</span>
             <span class="topic-label">${esc(cl.topic)}</span>
-            <span class="topic-meta">${nm}${cl.ticker} · ${unread}/${cl.rows.length} 則</span>
+            <span class="topic-meta">${cl.tickerString || ''} · ${unread}/${cl.rows.length} 則</span>
           </div>
           ${cl.rows.map(rowHTML).join("")}
         </div>`;
@@ -535,12 +524,14 @@ async function setRead(id, value){
   if(!r) return;
   const prev = r.read;
   r.read = value;
+  persistReadState();
   renderAll();
 
   const { error } = await supabase.from("news").update({ read: value }).eq("id", id);
   if(error){
     console.error("setRead failed:", error);
     r.read = prev;
+    persistReadState();
     renderAll();
   }
 }
@@ -550,12 +541,14 @@ async function setStarred(id, value){
   if(!r) return;
   const prev = r.starred;
   r.starred = value;
+  persistStarredState();
   renderAll();
 
   const { error } = await supabase.from("news").update({ starred: value }).eq("id", id);
   if(error){
     console.error("setStarred failed:", error);
     r.starred = prev;
+    persistStarredState();
     renderAll();
   }
 }
@@ -566,12 +559,14 @@ async function markAllRead(){
   const prev = ids.map(id=>DATA.find(d=>d.id===id)?.read);
 
   ids.forEach(id=>{ const r=DATA.find(d=>d.id===id); if(r) r.read=true; });
+  persistReadState();
   renderAll();
 
   const { error } = await supabase.from("news").update({ read: true }).in("id", ids);
   if(error){
     console.error("markAllRead failed:", error);
     ids.forEach((id,i)=>{ const r=DATA.find(d=>d.id===id); if(r) r.read=prev[i]; });
+    persistReadState();
     renderAll();
   }
 }
