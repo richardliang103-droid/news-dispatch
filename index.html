@@ -238,6 +238,7 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const state = { ticker:"all", view:"all", sort:"time", search:"", loading:true, error:false, category:"stock" };
 let DATA = [];
 let TICKERS = [];
+let EVENT_MAP = {}; // 語意事件 overlay（從 events.json 載入）
 
 // ── 股票名稱對照表 ──
 const TICKER_NAMES = {
@@ -302,6 +303,28 @@ async function fetchNews(){
 
     // 用 localStorage 覆蓋 read/starred 狀態（當 Supabase 寫入失敗時的備援）
     applyLocalState();
+
+    // 嘗試載入 events.json（語意事件分類 overlay）
+    try {
+      const resp = await fetch('events.json?v=' + Date.now());
+      if(resp.ok) {
+        const events = await resp.json();
+        if(events && events.items) {
+          EVENT_MAP = events.items;
+          for(const r of DATA) {
+            const ev = EVENT_MAP[r.id] || EVENT_MAP[r.url] || null;
+            if(ev) {
+              r.event_key = ev.event_key;
+              r.event_label = ev.event_label;
+              r.event_confidence = ev.confidence || 0;
+            }
+          }
+        }
+      }
+    } catch(e) {
+      // events.json 載入失敗不可中斷頁面
+      console.warn('events.json 載入失敗，使用 deterministic fallback', e);
+    }
 
     // 從資料中提取 ticker 列表（按出現順序，去重）
     const seen = new Set();
@@ -573,6 +596,29 @@ function groupByEvent(rows){
   }
   return clusters.filter(c=>c.eventRows.length>0);
 }
+function groupByOverlayWithFallback(rows){
+  // 先按 overlay event_key 分組
+  const hasEvent = rows.filter(r=>r.event_key);
+  const noEvent = rows.filter(r=>!r.event_key);
+  const result = [];
+  if(hasEvent.length > 0){
+    const byKey = {};
+    for(const r of hasEvent){
+      const k = r.event_key;
+      if(!byKey[k]) byKey[k] = {eventLabel: r.event_label || k, eventRows: [], eventKey: k};
+      byKey[k].eventRows.push(r);
+    }
+    for(const [k, g] of Object.entries(byKey)){
+      result.push({eventRows: g.eventRows, eventLabel: g.eventLabel, _overlay: true});
+    }
+  }
+  // 無 overlay 的 row 走 deterministic groupByEvent
+  if(noEvent.length > 0){
+    const fallback = groupByEvent(noEvent);
+    result.push(...fallback);
+  }
+  return result;
+}
 function rowHTML(r){
   const tag = state.sort==="time" ? `<span class="rtk">${TICKER_NAMES[r.ticker]||r.ticker}${r.ticker}</span>` : "";
   return `<article class="row ${r.read?"":"unread"} ${r.starred?"starred":""}" role="button" tabindex="0" data-id="${r.id}">
@@ -640,7 +686,7 @@ function render(){
           return rowHTML(cl.rows[0]);
         }
         // 多篇同主題 → 內部再做事件分群
-        const eventClusters = groupByEvent(cl.rows);
+        const eventClusters = groupByOverlayWithFallback(cl.rows);
         const eventHTML = eventClusters.map(ec => {
           if(ec.eventRows.length === 1) return rowHTML(ec.eventRows[0]);
           const unread = ec.eventRows.filter(r=>!r.read).length;
