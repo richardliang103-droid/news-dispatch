@@ -368,9 +368,10 @@ function renderRail(){
   const wl = items.map(it=>{
     const n = it.ticker==="all" ? totalUnread() : unreadOf(it.ticker);
     const cls = (it.ticker==="all"?"all ":"") + (it.ticker===state.ticker?"active":"");
+    const label = it.ticker==="all" ? "全部" : (it.name !== it.ticker ? it.name : it.ticker);
+    const tickerTag = it.ticker!=="all" && it.name !== it.ticker ? `<span class="nm">${it.ticker}</span>` : "";
     return `<button class="wl-item ${cls}" data-ticker="${it.ticker}">
-      <span class="tk">${it.ticker==="all"?"全部":it.ticker}</span>
-      ${it.ticker!=="all"?`<span class="nm">${it.name}</span>`:""}
+      <span class="tk">${label}</span>${tickerTag}
       <span class="badge ${n===0?"zero":""}">${n}</span></button>`;
   }).join("");
   document.getElementById("watchlist").innerHTML = wl;
