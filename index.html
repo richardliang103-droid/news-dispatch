@@ -395,7 +395,7 @@ function clusterByTopic(articles){
         if(used.has(b.id)) continue;
         const bBg = getBigrams(b.title);
         const shared = aBg.filter(x => bBg.includes(x)).length;
-        if(shared >= 4){ cluster.push(b); used.add(b.id); }
+        if(shared >= 3){ cluster.push(b); used.add(b.id); }
       }
       // 生成主題標籤：取所有標題中最常出現的連續片段
       let topic = "";
