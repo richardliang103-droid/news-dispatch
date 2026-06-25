@@ -87,6 +87,12 @@ input{font:inherit}
 .markall{font-size:12.5px;color:var(--muted);padding:6px 8px;border-radius:8px;transition:background .15s,color .15s;white-space:nowrap}
 .markall:hover{background:var(--hover);color:var(--ink)}
 
+/* ---------- category tabs ---------- */
+.cat-tabs{display:flex;gap:0;padding:8px 22px 0;border-bottom:1px solid var(--border)}
+.cat-tab{padding:8px 18px;font-family:var(--sans);font-size:13px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;transition:color .15s,border-color .15s;cursor:pointer}
+.cat-tab:hover{color:var(--ink)}
+.cat-tab.active{color:var(--ink);border-bottom-color:var(--signal)}
+
 /* ---------- skeleton ---------- */
 .skeleton{background:linear-gradient(90deg,var(--hair) 25%,var(--border) 50%,var(--hair) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
@@ -193,6 +199,10 @@ html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#
         <div class="h-left"><h1>晨報</h1><span class="date-sub" id="date-sub"></span></div>
         <button class="icon-btn" id="themeBtn" title="切換深淺色" aria-label="切換深淺色"></button>
       </div>
+      <div class="cat-tabs">
+        <button class="cat-tab active" data-cat="stock">📈 股市</button>
+        <button class="cat-tab" data-cat="tech">💻 科技</button>
+      </div>
       <div class="toolbar">
         <div class="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
@@ -225,7 +235,7 @@ const SUPABASE_ANON_KEY = "sb_publishable_mBWmYim24FPVM2INU6KjKQ_ZbEl2wrn";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ── 全域狀態 ──
-const state = { ticker:"all", view:"all", sort:"time", search:"", loading:true, error:false };
+const state = { ticker:"all", view:"all", sort:"time", search:"", loading:true, error:false, category:"stock" };
 let DATA = [];
 let TICKERS = [];
 
@@ -266,9 +276,11 @@ async function fetchNews(){
   renderSkeleton();
 
   try {
+    const srcType = state.category === "tech" ? "tech" : "stock";
     const { data, error } = await supabase
       .from("news")
       .select("*")
+      .eq("source_type", srcType)
       .order("published", { ascending: false })
       .limit(200);
 
@@ -604,6 +616,15 @@ document.getElementById("viewSeg").querySelectorAll("button").forEach(b=>{
 });
 document.getElementById("sortSeg").querySelectorAll("button").forEach(b=>{
   b.onclick = ()=>{ state.sort=b.dataset.sort; b.parentElement.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); renderAll(); };
+});
+// 類別切換
+document.querySelectorAll(".cat-tab").forEach(b=>{
+  b.onclick = ()=>{
+    state.category = b.dataset.cat;
+    state.ticker = "all";
+    document.querySelectorAll(".cat-tab").forEach(x=>x.classList.toggle("active",x===b));
+    fetchNews();
+  };
 });
 document.getElementById("search").addEventListener("input", e=>{ state.search=e.target.value.trim().toLowerCase(); renderAll(); });
 document.getElementById("markAll").onclick = markAllRead;
