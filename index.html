@@ -417,21 +417,37 @@ const totalStar = () => DATA.filter(d=>d.starred).length;
 // ── localStorage 本地持久化（Supabase 寫入失敗時的備援） ──
 const LS_READ = "ns-read-ids";
 const LS_STAR = "ns-star-ids";
+function storedIdSet(key){
+  try { return new Set((JSON.parse(localStorage.getItem(key) || "[]") || []).map(String)); }
+  catch(e){ return new Set(); }
+}
+function writeIdSet(key, ids){
+  try { localStorage.setItem(key, JSON.stringify([...ids])); } catch(e){}
+}
 function persistReadState(){
-  try { localStorage.setItem(LS_READ, JSON.stringify(DATA.filter(d=>d.read).map(d=>d.id))); } catch(e){}
+  const ids = storedIdSet(LS_READ);
+  for(const d of DATA){
+    const k = String(d.id);
+    if(d.read) ids.add(k); else ids.delete(k);
+  }
+  writeIdSet(LS_READ, ids);
 }
 function persistStarredState(){
-  try { localStorage.setItem(LS_STAR, JSON.stringify(DATA.filter(d=>d.starred).map(d=>d.id))); } catch(e){}
+  const ids = storedIdSet(LS_STAR);
+  for(const d of DATA){
+    const k = String(d.id);
+    if(d.starred) ids.add(k); else ids.delete(k);
+  }
+  writeIdSet(LS_STAR, ids);
 }
 function applyLocalState(){
-  try {
-    const raw = localStorage.getItem(LS_READ);
-    if(raw){ const ids=new Set(JSON.parse(raw)); DATA.forEach(d=>{if(ids.has(d.id))d.read=true;}); }
-  } catch(e){}
-  try {
-    const raw = localStorage.getItem(LS_STAR);
-    if(raw){ const ids=new Set(JSON.parse(raw)); DATA.forEach(d=>{if(ids.has(d.id))d.starred=true;}); }
-  } catch(e){}
+  const readIds = storedIdSet(LS_READ);
+  const starIds = storedIdSet(LS_STAR);
+  DATA.forEach(d=>{
+    const k = String(d.id);
+    if(readIds.has(k)) d.read = true;
+    if(starIds.has(k)) d.starred = true;
+  });
 }
 
 function matches(r){
@@ -770,54 +786,44 @@ function renderAll(){
 
 // ── Supabase 寫入操作（樂觀更新） ──
 async function setRead(id, value){
-  const r = DATA.find(d=>d.id===id);
+  const r = DATA.find(d=>String(d.id)===String(id));
   if(!r) return;
-  const prev = r.read;
   r.read = value;
   persistReadState();
   renderAll();
 
   const { error } = await supabase.from("news").update({ read: value }).eq("id", id);
   if(error){
-    console.error("setRead failed:", error);
-    r.read = prev;
-    persistReadState();
-    renderAll();
+    // localStorage 是使用者端權威備援；DB 寫入失敗時不可回滾 UI，否則切換頁面會變回未讀。
+    console.warn("setRead persisted locally; Supabase update failed:", error);
   }
 }
 
 async function setStarred(id, value){
-  const r = DATA.find(d=>d.id===id);
+  const r = DATA.find(d=>String(d.id)===String(id));
   if(!r) return;
-  const prev = r.starred;
   r.starred = value;
   persistStarredState();
   renderAll();
 
   const { error } = await supabase.from("news").update({ starred: value }).eq("id", id);
   if(error){
-    console.error("setStarred failed:", error);
-    r.starred = prev;
-    persistStarredState();
-    renderAll();
+    console.warn("setStarred persisted locally; Supabase update failed:", error);
   }
 }
 
 async function markAllRead(){
   const ids = DATA.filter(matches).map(r=>r.id);
   if(!ids.length) return;
-  const prev = ids.map(id=>DATA.find(d=>d.id===id)?.read);
 
-  ids.forEach(id=>{ const r=DATA.find(d=>d.id===id); if(r) r.read=true; });
+  ids.forEach(id=>{ const r=DATA.find(d=>String(d.id)===String(id)); if(r) r.read=true; });
   persistReadState();
   renderAll();
 
   const { error } = await supabase.from("news").update({ read: true }).in("id", ids);
   if(error){
-    console.error("markAllRead failed:", error);
-    ids.forEach((id,i)=>{ const r=DATA.find(d=>d.id===id); if(r) r.read=prev[i]; });
-    persistReadState();
-    renderAll();
+    // 保留本地已讀狀態，避免切換分類/重新載入時回到未讀。
+    console.warn("markAllRead persisted locally; Supabase update failed:", error);
   }
 }
 
