@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>Supabase Test</title></head>
+<body>
+<h1>Supabase 連線測試</h1>
+<pre id="result">載入中…</pre>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49/dist/umd/supabase.min.js"></script>
+<script>
+const el = document.getElementById('result');
+try {
+  const client = window.supabase.createClient(
+    'https://xrlboexuvgegdahfqegg.supabase.co',
+    'sb_publishable_mBWmYim24FPVM2INU6KjKQ_ZbEl2wrn'
+  );
+  el.textContent = 'Client created. Fetching…';
+  client.from('news').select('count').then(({data, error}) => {
+    if (error) { el.textContent = 'Error: ' + error.message; return; }
+    el.textContent = 'OK! ' + JSON.stringify(data);
+  });
+} catch(e) {
+  el.textContent = 'Exception: ' + e.message + '\n' + e.stack;
+}
+</script>
+</body>
+</html>
