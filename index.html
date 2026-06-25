@@ -196,8 +196,8 @@ html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#
             <button data-view="starred">收藏 <span class="cnt" id="cnt-star">…</span></button>
           </div>
           <div class="seg" id="sortSeg">
-            <button data-sort="ticker" class="active">標的</button>
-            <button data-sort="time">時間</button>
+            <button data-sort="ticker">標的</button>
+            <button data-sort="time" class="active">時間</button>
           </div>
           <button class="markall" id="markAll">全部已讀</button>
         </div>
@@ -216,9 +216,16 @@ const SUPABASE_ANON_KEY = "sb_publishable_mBWmYim24FPVM2INU6KjKQ_ZbEl2wrn";
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ── 全域狀態 ──
-const state = { ticker:"all", view:"all", sort:"ticker", search:"", loading:true, error:false };
+const state = { ticker:"all", view:"all", sort:"time", search:"", loading:true, error:false };
 let DATA = [];
 let TICKERS = [];
+
+// ── 股票名稱對照表 ──
+const TICKER_NAMES = {
+  "2881":"富邦金","2882":"國泰金","2884":"玉山金",
+  "2886":"兆豐金","2887":"台新新光金","2890":"永豐金","2891":"中信金",
+  "2330":"台積電","2454":"聯發科","NVDA":"輝達","AAPL":"蘋果","AMD":"超微",
+};
 
 // ── Icon SVGs ──
 const ICONS = {
@@ -277,7 +284,7 @@ async function fetchNews(){
     for(const r of DATA){
       if(!seen.has(r.ticker)){
         seen.add(r.ticker);
-        TICKERS.push({ ticker: r.ticker, name: r.ticker });
+        TICKERS.push({ ticker: r.ticker, name: TICKER_NAMES[r.ticker] || r.ticker });
       }
     }
 
@@ -358,7 +365,7 @@ function renderRail(){
 
 // ── Row template ──
 function rowHTML(r){
-  const tag = state.sort==="time" ? `<span class="rtk">${r.ticker}</span>` : "";
+  const tag = state.sort==="time" ? `<span class="rtk">${TICKER_NAMES[r.ticker]||r.ticker}${r.ticker}</span>` : "";
   return `<article class="row ${r.read?"":"unread"} ${r.starred?"starred":""}" role="button" tabindex="0" data-id="${r.id}">
     <div class="r-main">
       <div class="title">${esc(r.title)}</div>
@@ -378,7 +385,7 @@ function render(){
 
   if(items.length===0){
     wrap.innerHTML = "";
-    let mk="✓", big="今天的新聞都看完了", small="明早 07:50 會有新的一批";
+    let mk="✓", big="今天的新聞都看完了", small="明早 07:30 會有新的一批";
     if(state.search){ mk="⌕"; big=`找不到符合「${state.search}」的新聞`; small="換個關鍵字試試"; }
     else if(state.view==="starred"){ mk="☆"; big="還沒有收藏"; small="點任一則右側的星號加入"; }
     empty.innerHTML = `<div class="mk">${mk}</div><div class="big">${big}</div><div class="small">${small}</div>`;
@@ -392,14 +399,38 @@ function render(){
     wrap.innerHTML = order.filter(tk=>items.some(i=>i.ticker===tk)).map(tk=>{
       const rows = items.filter(i=>i.ticker===tk);
       const unread = rows.filter(r=>!r.read).length;
+      const nm = TICKER_NAMES[tk] || tk;
       return `<section class="group">
-        <div class="group-head"><span class="gtk">${tk}</span><span class="gnm">${nameOf(tk)}</span><span class="gline"></span><span class="gcount">${unread}/${rows.length}</span></div>
+        <div class="group-head"><span class="gtk">${nm}${tk}</span><span class="gline"></span><span class="gcount">${unread}/${rows.length}</span></div>
         ${rows.map(rowHTML).join("")}
       </section>`;
     }).join("");
   } else {
-    const rows = [...items].sort((a,b)=>b.ts-a.ts);
-    wrap.innerHTML = `<section class="group"><div class="group-head"><span class="gnm">最新</span><span class="gline"></span><span class="gcount">${rows.length} 則</span></div>${rows.map(rowHTML).join("")}</section>`;
+    // 依時間排序：按日期分組
+    const sorted = [...items].sort((a,b)=>b.ts-a.ts);
+    // 日期格式化：2026/6/25(四)
+    const weekMap = ["日","一","二","三","四","五","六"];
+    const dateLabel = (ts) => {
+      const d = new Date(ts);
+      return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}(${weekMap[d.getDay()]})`;
+    };
+    // 分組
+    const groups = [];
+    let curDate = "";
+    for(const r of sorted){
+      const lbl = dateLabel(r.ts);
+      if(lbl !== curDate){
+        curDate = lbl;
+        groups.push({label: lbl, rows: []});
+      }
+      groups[groups.length-1].rows.push(r);
+    }
+    wrap.innerHTML = groups.map(g =>
+      `<section class="group">
+        <div class="group-head"><span class="gnm">${g.label}</span><span class="gline"></span><span class="gcount">${g.rows.length} 則</span></div>
+        ${g.rows.map(rowHTML).join("")}
+      </section>`
+    ).join("");
   }
 }
 
