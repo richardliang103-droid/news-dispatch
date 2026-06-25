@@ -123,7 +123,7 @@ export async function fetchEventsFallback() {
         map[aid] = {
           event_key: ev.event_key,
           event_label: ev.event_label,
-          summary: ev.summary || null,
+          summary: ev.event_summary || ev.summary || null,
           confidence: ev.confidence || 0,
         };
       }
