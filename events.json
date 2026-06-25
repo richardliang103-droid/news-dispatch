@@ -1,17 +1,17 @@
 {
   "version": 1,
-  "generated_at": "2026-06-25T21:18:05.709229+08:00",
+  "generated_at": "2026-06-25T21:22:20.809588+08:00",
   "classified_by": "metis",
   "source": "supabase-news",
   "items": {
     "2017": {
-      "event_key": "2026-06-25-stock-其他重點-mega-stock-surge",
-      "event_label": "兆豐金飆漲26年新高",
+      "event_key": "2026-06-25-stock-其他重點-mega-financial-stock-surge",
+      "event_label": "兆豐金股價飆漲創26年新高",
       "confidence": 0.85
     },
     "2012": {
-      "event_key": "2026-06-25-stock-其他重點-mega-stock-surge",
-      "event_label": "兆豐金飆漲26年新高",
+      "event_key": "2026-06-25-stock-其他重點-mega-financial-stock-surge",
+      "event_label": "兆豐金股價飆漲創26年新高",
       "confidence": 0.85
     },
     "2060": {
@@ -70,23 +70,23 @@
       "confidence": 0.95
     },
     "2014": {
-      "event_key": "2026-06-24-stock-其他重點-ccp-syndicated-loan",
-      "event_label": "中化製藥五十億ESG聯貸",
-      "confidence": 0.95
+      "event_key": "2026-06-24-stock-其他重點-ccp-esg-syndicated-loan",
+      "event_label": "中化製藥ESG聯貸五十億",
+      "confidence": 0.92
     },
     "2008": {
-      "event_key": "2026-06-24-stock-其他重點-ccp-syndicated-loan",
-      "event_label": "中化製藥五十億ESG聯貸",
-      "confidence": 0.95
+      "event_key": "2026-06-24-stock-其他重點-ccp-esg-syndicated-loan",
+      "event_label": "中化製藥ESG聯貸五十億",
+      "confidence": 0.92
     },
     "2128": {
-      "event_key": "2026-06-24-stock-其他重點-taishin-workplace-award",
-      "event_label": "台新新光金幸福企業獲獎",
+      "event_key": "2026-06-24-stock-其他重點-tsc-shiner-happy-workplace",
+      "event_label": "台新新光金獲幸福企業獎",
       "confidence": 0.9
     },
     "2126": {
-      "event_key": "2026-06-24-stock-其他重點-taishin-workplace-award",
-      "event_label": "台新新光金幸福企業獲獎",
+      "event_key": "2026-06-24-stock-其他重點-tsc-shiner-happy-workplace",
+      "event_label": "台新新光金獲幸福企業獎",
       "confidence": 0.9
     }
   }
