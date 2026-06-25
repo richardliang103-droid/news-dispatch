@@ -155,14 +155,6 @@ html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49/dist/umd/supabase.min.js"></script>
-<script>
-// DEBUG: 捕捉所有錯誤
-window._errors = [];
-window.onerror = function(m, s, l, c, e) {
-  window._errors.push({msg:m, src:s, line:l, col:c});
-  return false;
-};
-</script>
 </head>
 <body>
 <div class="app">
