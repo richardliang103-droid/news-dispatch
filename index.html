@@ -164,7 +164,6 @@ html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#
   .feed-head{padding:0 16px;height:56px}
   .h-left h1{font-size:19px}
   .toolbar{padding:0 16px 12px}
-  .markall{display:none}
   .groups{padding:8px 8px 56px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
@@ -495,9 +494,11 @@ function render(){
       if(lbl !== curDate){ curDate = lbl; dateGroups.push({label:lbl, rows:[]}); }
       dateGroups[dateGroups.length-1].rows.push(r);
     }
-    // 每個日期內做主題聚類
+    // 每個日期內做主題聚類（科技新聞跳過聚類，直接列出）
     wrap.innerHTML = dateGroups.map(dg => {
-      const clusters = clusterByTopic(dg.rows);
+      const clusters = state.category === "tech" 
+        ? dg.rows.map(r => ({ticker:r.ticker, topic:"", rows:[r]}))  // 科技新聞不聚類
+        : clusterByTopic(dg.rows);
       const clusterHTML = clusters.map(cl => {
         if(cl.rows.length === 1){
           return rowHTML(cl.rows[0]);
@@ -603,7 +604,7 @@ document.getElementById("groups").addEventListener("click", e=>{
   const s = e.target.closest(".star");
   if(s){ e.stopPropagation(); toggleStar(+s.dataset.star); return; }
   const row = e.target.closest(".row");
-  if(row) openRow(row);
+  if(row){ e.stopPropagation(); openRow(row); }
 });
 document.getElementById("groups").addEventListener("keydown", e=>{
   const row = e.target.closest(".row");
