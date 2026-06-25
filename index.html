@@ -1,0 +1,520 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>晨報 · 個人股市新聞</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{ /* light (default) — warm paper */
+  --bg:#FBFAF6; --surface:#FFFFFF; --hover:#F3F0E9;
+  --border:#E7E2D8; --hair:#EEEAE1;
+  --ink:#211C16; --muted:#79716A; --dim:#ABA39A;
+  --signal:#B8860B; --signal-soft:rgba(184,134,11,.13); --signal-line:rgba(184,134,11,.9);
+  --serif:"Newsreader","Noto Serif TC",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,system-ui,"Segoe UI","Noto Sans TC",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --head-h:64px;
+}
+html[data-theme="dark"]{ /* warm lamplit dark */
+  --bg:#16130E; --surface:#1E1A14; --hover:#25201A;
+  --border:#2C261E; --hair:#231E17;
+  --ink:#ECE6DC; --muted:#9A9085; --dim:#5F574C;
+  --signal:#E3A008; --signal-soft:rgba(227,160,8,.13); --signal-line:rgba(227,160,8,.92);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;transition:background .3s,color .3s}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input{font:inherit}
+::selection{background:var(--signal-soft)}
+.rail::-webkit-scrollbar,.feed::-webkit-scrollbar{width:11px}
+.rail::-webkit-scrollbar-thumb,.feed::-webkit-scrollbar-thumb{background:var(--border);border-radius:6px;border:3px solid var(--bg)}
+
+/* ---------- layout ---------- */
+.app{display:grid;grid-template-columns:256px 1fr;height:100dvh;overflow:hidden}
+.rail{border-right:1px solid var(--border);padding:20px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:24px}
+.feed{overflow-y:auto;position:relative}
+.chipbar{display:none}
+
+/* ---------- rail ---------- */
+.brand{display:flex;align-items:baseline;gap:8px;padding:0 8px}
+.brand .mark{color:var(--signal);font-size:17px;position:relative;top:1px}
+.brand .name{font-family:var(--serif);font-weight:600;font-size:21px;letter-spacing:.01em}
+.brand .sub{margin-left:2px;font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;color:var(--dim)}
+.rail-label{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:0 8px;margin-bottom:9px}
+.watchlist{display:flex;flex-direction:column;gap:1px}
+.wl-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px;border-radius:8px;color:var(--muted);transition:background .15s,color .15s}
+.wl-item:hover{background:var(--hover)}
+.wl-item.active{background:var(--hover);color:var(--ink)}
+.wl-item .tk{font-family:var(--mono);font-weight:500;font-size:13px;letter-spacing:.02em;color:var(--ink)}
+.wl-item.all .tk{font-family:var(--sans)}
+.wl-item .nm{font-size:12.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wl-item .badge{margin-left:auto;min-width:21px;height:18px;padding:0 6px;border-radius:9px;background:var(--signal-soft);color:var(--signal);font-family:var(--mono);font-size:11px;font-weight:500;display:inline-flex;align-items:center;justify-content:center}
+.wl-item .badge.zero{background:transparent;color:var(--dim)}
+.date-nav{display:flex;flex-direction:column;gap:1px}
+.date{display:flex;align-items:center;justify-content:space-between;padding:7px 8px;border-radius:8px;color:var(--muted);font-size:13px;transition:background .15s,color .15s}
+.date:hover{background:var(--hover)}
+.date.active{color:var(--ink)}
+.date .when{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.rail-foot{margin-top:auto;display:flex;align-items:center;gap:8px;padding:8px;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.02em}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--signal);animation:pulse 2.6s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(184,134,11,.4)}70%{box-shadow:0 0 0 6px rgba(184,134,11,0)}100%{box-shadow:0 0 0 0 rgba(184,134,11,0)}}
+
+/* ---------- feed top (sticky head + toolbar) ---------- */
+.feed-top{position:sticky;top:0;z-index:6;background:var(--bg);border-bottom:1px solid var(--border)}
+.feed-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 22px;height:var(--head-h)}
+.h-left{display:flex;align-items:baseline;gap:10px}
+.h-left h1{font-family:var(--serif);font-size:22px;font-weight:600;letter-spacing:.01em}
+.h-left .date-sub{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.02em}
+.icon-btn{width:34px;height:34px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);border:1px solid var(--border);transition:background .15s,color .15s}
+.icon-btn:hover{background:var(--hover);color:var(--ink)}
+.icon-btn svg{width:16px;height:16px}
+.toolbar{display:flex;align-items:center;gap:10px;padding:0 22px 14px;flex-wrap:wrap}
+.search{flex:1 1 200px;position:relative;min-width:160px}
+.search svg{width:15px;height:15px;position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--dim)}
+.search input{width:100%;padding:8px 12px 8px 32px;background:var(--surface);border:1px solid var(--border);border-radius:9px;color:var(--ink);font-size:13px}
+.search input::placeholder{color:var(--dim)}
+.search input:focus{outline:none;border-color:var(--signal);box-shadow:0 0 0 3px var(--signal-soft)}
+.tools{display:flex;align-items:center;gap:8px}
+.seg{display:flex;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:2px}
+.seg button{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;font-size:12.5px;color:var(--muted);transition:background .15s,color .15s;white-space:nowrap}
+.seg button.active{background:var(--hover);color:var(--ink)}
+.seg button .cnt{font-family:var(--mono);font-size:10.5px;color:var(--signal)}
+.seg button:not(.active) .cnt{color:var(--dim)}
+.markall{font-size:12.5px;color:var(--muted);padding:6px 8px;border-radius:8px;transition:background .15s,color .15s;white-space:nowrap}
+.markall:hover{background:var(--hover);color:var(--ink)}
+
+/* ---------- skeleton ---------- */
+.skeleton{background:linear-gradient(90deg,var(--hair) 25%,var(--border) 50%,var(--hair) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sk-row{display:flex;align-items:center;gap:12px;padding:16px 22px}
+.sk-title{height:20px;flex:1}
+.sk-meta{height:14px;width:180px}
+
+/* ---------- groups & rows ---------- */
+.groups{padding:10px 14px 70px}
+.group{margin-top:16px}
+.group-head{display:flex;align-items:baseline;gap:10px;padding:6px 10px 10px}
+.group-head .gtk{font-family:var(--mono);font-weight:500;font-size:13px;letter-spacing:.03em;color:var(--ink)}
+.group-head .gnm{font-size:12.5px;color:var(--muted)}
+.group-head .gline{flex:1;height:1px;align-self:center;background:var(--hair)}
+.group-head .gcount{font-family:var(--mono);font-size:11px;color:var(--dim)}
+.row{display:flex;align-items:flex-start;gap:10px;width:100%;text-align:left;padding:13px 12px 13px 16px;border-radius:11px;border-left:2px solid transparent;transition:background .15s,border-color .3s ease}
+.row:hover{background:var(--hover)}
+.row:focus-visible{outline:2px solid var(--signal);outline-offset:-2px}
+.row.unread{border-left-color:var(--signal-line)}
+.r-main{flex:1;min-width:0;cursor:pointer}
+.row .title{font-family:var(--serif);font-size:17px;line-height:1.42;font-weight:500;color:var(--dim);letter-spacing:.004em;transition:color .3s ease}
+.row.unread .title{color:var(--ink);font-weight:600}
+.row .meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.01em}
+.row.unread .meta{color:var(--muted)}
+.row .rtk{color:var(--ink);font-weight:500;padding-right:2px}
+.row .sep{opacity:.5}
+.chip{font-family:var(--sans);font-size:11px;color:var(--muted);border:1px solid var(--border);padding:1px 7px;border-radius:6px}
+.star{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .15s,color .15s,transform .15s}
+.star:hover{background:var(--hover);color:var(--signal)}
+.star svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.3}
+.row.starred .star{color:var(--signal)}
+.row.starred .star svg{fill:var(--signal);stroke:none}
+.star.spin svg{animation:pop .3s ease}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+/* ---------- empty ---------- */
+.empty{display:none;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;padding:100px 20px;min-height:340px}
+.empty.show{display:flex}
+.empty .mk{width:42px;height:42px;border-radius:50%;background:var(--signal-soft);color:var(--signal);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:6px}
+.empty .big{font-family:var(--serif);font-size:18px;color:var(--ink)}
+.empty .small{font-family:var(--mono);font-size:12px;color:var(--dim)}
+
+/* ---------- err banner ---------- */
+.err-banner{display:none;align-items:center;gap:8px;padding:8px 16px;margin:10px 22px;background:#FFF0F0;border:1px solid #FCC;border-radius:9px;font-size:12.5px;color:#C44}
+html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#F88}
+.err-banner.show{display:flex}
+.err-banner .retry{font-family:var(--mono);margin-left:auto;color:var(--signal);cursor:pointer;font-size:11px}
+
+/* ---------- mobile ---------- */
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .rail{display:none}
+  .chipbar{display:flex;gap:8px;overflow-x:auto;padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg)}
+  .chipbar::-webkit-scrollbar{display:none}
+  .chip-tk{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1px solid var(--border);color:var(--muted);font-size:13px;white-space:nowrap}
+  .chip-tk.active{background:var(--hover);color:var(--ink);border-color:transparent}
+  .chip-tk.all{font-family:var(--sans)}
+  .chip-tk .tk{font-family:var(--mono);font-weight:500;color:var(--ink)}
+  .chip-tk .badge{min-width:18px;height:16px;padding:0 5px;border-radius:8px;background:var(--signal-soft);color:var(--signal);font-family:var(--mono);font-size:10.5px;display:inline-flex;align-items:center;justify-content:center}
+  .feed-head{padding:0 16px;height:56px}
+  .h-left h1{font-size:19px}
+  .toolbar{padding:0 16px 12px}
+  .markall{display:none}
+  .groups{padding:8px 8px 56px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+<div class="app">
+  <!-- left rail / watchlist -->
+  <aside class="rail">
+    <div class="brand"><span class="mark">◆</span><span class="name">晨報</span><span class="sub">DISPATCH</span></div>
+    <div>
+      <div class="rail-label">追蹤標的</div>
+      <nav class="watchlist" id="watchlist"></nav>
+    </div>
+    <div>
+      <div class="rail-label">日期</div>
+      <div class="date-nav">
+        <button class="date active"><span>今日</span><span class="when" id="date-when"></span></button>
+      </div>
+    </div>
+    <div class="rail-foot"><span class="pulse"></span><span id="update-time">載入中…</span></div>
+  </aside>
+
+  <!-- mobile ticker chips -->
+  <div class="chipbar" id="chipbar"></div>
+
+  <!-- main feed -->
+  <main class="feed">
+    <div class="feed-top">
+      <div class="feed-head">
+        <div class="h-left"><h1>晨報</h1><span class="date-sub" id="date-sub"></span></div>
+        <button class="icon-btn" id="themeBtn" title="切換深淺色" aria-label="切換深淺色"></button>
+      </div>
+      <div class="toolbar">
+        <div class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="search" placeholder="搜尋標題、來源…" autocomplete="off">
+        </div>
+        <div class="tools">
+          <div class="seg" id="viewSeg">
+            <button data-view="all" class="active">全部</button>
+            <button data-view="unread">未讀 <span class="cnt" id="cnt-unread">…</span></button>
+            <button data-view="starred">收藏 <span class="cnt" id="cnt-star">…</span></button>
+          </div>
+          <div class="seg" id="sortSeg">
+            <button data-sort="ticker" class="active">標的</button>
+            <button data-sort="time">時間</button>
+          </div>
+          <button class="markall" id="markAll">全部已讀</button>
+        </div>
+      </div>
+    </div>
+    <div class="err-banner" id="errBanner"><span>⚠ 載入失敗</span><button class="retry" id="retryBtn">重試</button></div>
+    <div class="groups" id="groups"></div>
+    <div class="empty" id="empty"></div>
+  </main>
+</div>
+
+<script>
+// ── Supabase 初始化 ──
+const SUPABASE_URL = "https://xrlboexuvgegdahfqegg.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_mBWmYim24FPVM2INU6KjKQ_ZbEl2wrn";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ── 全域狀態 ──
+const state = { ticker:"all", view:"all", sort:"ticker", search:"", loading:true, error:false };
+let DATA = [];
+let TICKERS = [];
+
+// ── Icon SVGs ──
+const ICONS = {
+  star:'<svg viewBox="0 0 20 20"><path d="M9.05 2.93c.3-.92 1.6-.92 1.9 0l1.52 4.67a1 1 0 0 0 .95.69h4.91c.97 0 1.37 1.24.59 1.81l-3.98 2.89a1 1 0 0 0-.36 1.12l1.52 4.67c.3.92-.76 1.69-1.54 1.12l-3.98-2.89a1 1 0 0 0-1.18 0l-3.97 2.89c-.79.57-1.84-.2-1.54-1.12l1.52-4.67a1 1 0 0 0-.36-1.12L2.05 10.1c-.78-.57-.38-1.81.59-1.81h4.91a1 1 0 0 0 .95-.69L9.05 2.93Z"/></svg>',
+  sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6 19 19M19 5l-1.4 1.4M6.4 17.6 5 19"/></svg>',
+  moon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>',
+};
+
+// ── 時間輔助 ──
+function fmtTime(ts){
+  if(!ts) return "";
+  const d = new Date(ts);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today - 86400000);
+  const dm = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mm = String(d.getMinutes()).padStart(2,'0');
+  if(dm.getTime() === today.getTime()) return `${hh}:${mm}`;
+  if(dm.getTime() === yesterday.getTime()) return `昨 ${hh}:${mm}`;
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+// ── 從 Supabase 載入資料 ──
+async function fetchNews(){
+  state.loading = true;
+  state.error = false;
+  document.getElementById("errBanner").classList.remove("show");
+  renderSkeleton();
+
+  try {
+    const { data, error } = await supabase
+      .from("news")
+      .select("*")
+      .order("published", { ascending: false })
+      .limit(200);
+
+    if(error) throw error;
+
+    DATA = (data || []).map(r => ({
+      id: r.id,
+      ticker: r.ticker,
+      title: r.title,
+      url: r.url,
+      source: r.source || "",
+      theme: r.theme || "其他",
+      time: fmtTime(r.published),
+      ts: r.published ? new Date(r.published).getTime() : 0,
+      read: r.read || false,
+      starred: r.starred || false,
+    }));
+
+    // 從資料中提取 ticker 列表（按出現順序，去重）
+    const seen = new Set();
+    TICKERS = [];
+    for(const r of DATA){
+      if(!seen.has(r.ticker)){
+        seen.add(r.ticker);
+        TICKERS.push({ ticker: r.ticker, name: r.ticker });
+      }
+    }
+
+    // 更新時間
+    const now = new Date();
+    document.getElementById("update-time").textContent =
+      `更新於 ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.getElementById("date-sub").textContent =
+      `${now.getMonth()+1}/${now.getDate()} 週${['日','一','二','三','四','五','六'][now.getDay()]}`;
+    document.getElementById("date-when").textContent =
+      `${now.getMonth()+1}/${now.getDate()} ${['日','一','二','三','四','五','六'][now.getDay()]}`;
+
+    state.loading = false;
+    renderAll();
+  } catch(e){
+    console.error("Supabase fetch error:", e);
+    state.loading = false;
+    state.error = true;
+    document.getElementById("errBanner").classList.add("show");
+    document.getElementById("groups").innerHTML = "";
+    showEmpty("⚠", "載入新聞失敗", "請檢查網路後點擊重試");
+  }
+}
+
+function renderSkeleton(){
+  const wrap = document.getElementById("groups");
+  wrap.innerHTML = Array.from({length:6}, () =>
+    `<div class="sk-row"><div class="skeleton sk-title"></div><div class="skeleton sk-meta"></div></div>`
+  ).join("");
+  document.getElementById("empty").classList.remove("show");
+}
+
+function showEmpty(mk, big, small){
+  const el = document.getElementById("empty");
+  el.innerHTML = `<div class="mk">${mk}</div><div class="big">${big}</div><div class="small">${small}</div>`;
+  el.classList.add("show");
+}
+
+// ── 輔助函數 ──
+const nameOf = t => (TICKERS.find(x=>x.ticker===t)||{}).name || t;
+const unreadOf = t => DATA.filter(d=>d.ticker===t && !d.read).length;
+const totalUnread = () => DATA.filter(d=>!d.read).length;
+const totalStar = () => DATA.filter(d=>d.starred).length;
+
+function matches(r){
+  if(state.ticker!=="all" && r.ticker!==state.ticker) return false;
+  if(state.view==="unread"  && r.read)     return false;
+  if(state.view==="starred" && !r.starred) return false;
+  if(state.search){
+    const hay = (r.title+" "+r.source+" "+r.ticker+" "+r.theme).toLowerCase();
+    if(!hay.includes(state.search)) return false;
+  }
+  return true;
+}
+
+// ── Rail + mobile chips ──
+function renderRail(){
+  const items = [{ticker:"all", name:"全部"}, ...TICKERS];
+  const wl = items.map(it=>{
+    const n = it.ticker==="all" ? totalUnread() : unreadOf(it.ticker);
+    const cls = (it.ticker==="all"?"all ":"") + (it.ticker===state.ticker?"active":"");
+    return `<button class="wl-item ${cls}" data-ticker="${it.ticker}">
+      <span class="tk">${it.ticker==="all"?"全部":it.ticker}</span>
+      ${it.ticker!=="all"?`<span class="nm">${it.name}</span>`:""}
+      <span class="badge ${n===0?"zero":""}">${n}</span></button>`;
+  }).join("");
+  document.getElementById("watchlist").innerHTML = wl;
+
+  const cb = items.map(it=>{
+    const n = it.ticker==="all" ? totalUnread() : unreadOf(it.ticker);
+    const cls = (it.ticker==="all"?"all ":"") + (it.ticker===state.ticker?"active":"");
+    return `<button class="chip-tk ${cls}" data-ticker="${it.ticker}">
+      <span class="tk">${it.ticker==="all"?"全部":it.ticker}</span>
+      <span class="badge ${n===0?"zero":""}">${n}</span></button>`;
+  }).join("");
+  document.getElementById("chipbar").innerHTML = cb;
+}
+
+// ── Row template ──
+function rowHTML(r){
+  const tag = state.sort==="time" ? `<span class="rtk">${r.ticker}</span>` : "";
+  return `<article class="row ${r.read?"":"unread"} ${r.starred?"starred":""}" role="button" tabindex="0" data-id="${r.id}">
+    <div class="r-main">
+      <div class="title">${esc(r.title)}</div>
+      <div class="meta">${tag}<span>${esc(r.source)}</span><span class="sep">·</span><span>${r.time}</span><span class="chip">${esc(r.theme)}</span></div>
+    </div>
+    <button class="star" data-star="${r.id}" aria-label="收藏" title="收藏">${ICONS.star}</button>
+  </article>`;
+}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── 主渲染 ──
+function render(){
+  if(state.loading) return;
+  const wrap = document.getElementById("groups");
+  const empty = document.getElementById("empty");
+  const items = DATA.filter(matches);
+
+  if(items.length===0){
+    wrap.innerHTML = "";
+    let mk="✓", big="今天的新聞都看完了", small="明早 07:50 會有新的一批";
+    if(state.search){ mk="⌕"; big=`找不到符合「${state.search}」的新聞`; small="換個關鍵字試試"; }
+    else if(state.view==="starred"){ mk="☆"; big="還沒有收藏"; small="點任一則右側的星號加入"; }
+    empty.innerHTML = `<div class="mk">${mk}</div><div class="big">${big}</div><div class="small">${small}</div>`;
+    empty.classList.add("show");
+    return;
+  }
+  empty.classList.remove("show");
+
+  if(state.sort==="ticker"){
+    const order = TICKERS.map(t=>t.ticker);
+    wrap.innerHTML = order.filter(tk=>items.some(i=>i.ticker===tk)).map(tk=>{
+      const rows = items.filter(i=>i.ticker===tk);
+      const unread = rows.filter(r=>!r.read).length;
+      return `<section class="group">
+        <div class="group-head"><span class="gtk">${tk}</span><span class="gnm">${nameOf(tk)}</span><span class="gline"></span><span class="gcount">${unread}/${rows.length}</span></div>
+        ${rows.map(rowHTML).join("")}
+      </section>`;
+    }).join("");
+  } else {
+    const rows = [...items].sort((a,b)=>b.ts-a.ts);
+    wrap.innerHTML = `<section class="group"><div class="group-head"><span class="gnm">最新</span><span class="gline"></span><span class="gcount">${rows.length} 則</span></div>${rows.map(rowHTML).join("")}</section>`;
+  }
+}
+
+function renderAll(){
+  renderRail();
+  render();
+  updateCounts();
+}
+
+// ── Supabase 寫入操作（樂觀更新） ──
+async function setRead(id, value){
+  const r = DATA.find(d=>d.id===id);
+  if(!r) return;
+  const prev = r.read;
+  r.read = value;
+  renderAll();
+
+  const { error } = await supabase.from("news").update({ read: value }).eq("id", id);
+  if(error){
+    console.error("setRead failed:", error);
+    r.read = prev;
+    renderAll();
+  }
+}
+
+async function setStarred(id, value){
+  const r = DATA.find(d=>d.id===id);
+  if(!r) return;
+  const prev = r.starred;
+  r.starred = value;
+  renderAll();
+
+  const { error } = await supabase.from("news").update({ starred: value }).eq("id", id);
+  if(error){
+    console.error("setStarred failed:", error);
+    r.starred = prev;
+    renderAll();
+  }
+}
+
+async function markAllRead(){
+  const ids = DATA.filter(matches).map(r=>r.id);
+  if(!ids.length) return;
+  const prev = ids.map(id=>DATA.find(d=>d.id===id)?.read);
+
+  ids.forEach(id=>{ const r=DATA.find(d=>d.id===id); if(r) r.read=true; });
+  renderAll();
+
+  const { error } = await supabase.from("news").update({ read: true }).in("id", ids);
+  if(error){
+    console.error("markAllRead failed:", error);
+    ids.forEach((id,i)=>{ const r=DATA.find(d=>d.id===id); if(r) r.read=prev[i]; });
+    renderAll();
+  }
+}
+
+// ── 互動處理 ──
+function openRow(el){
+  const r = DATA.find(d=>d.id===+el.dataset.id);
+  if(!r) return;
+  window.open(r.url, "_blank");
+  if(r.read) return;
+  setRead(r.id, true);
+}
+
+function toggleStar(id){
+  const r = DATA.find(d=>d.id===id);
+  if(!r) return;
+  setStarred(id, !r.starred);
+}
+
+function updateCounts(){
+  renderRail();
+  document.getElementById("cnt-unread").textContent = totalUnread();
+  document.getElementById("cnt-star").textContent  = totalStar();
+}
+
+function selectTicker(tk){ state.ticker = tk; renderAll(); }
+
+// ── 事件綁定 ──
+document.getElementById("groups").addEventListener("click", e=>{
+  const s = e.target.closest(".star");
+  if(s){ e.stopPropagation(); toggleStar(+s.dataset.star); return; }
+  const row = e.target.closest(".row");
+  if(row) openRow(row);
+});
+document.getElementById("groups").addEventListener("keydown", e=>{
+  const row = e.target.closest(".row");
+  if(row && (e.key==="Enter"||e.key===" ")){ e.preventDefault(); openRow(row); }
+});
+document.addEventListener("click", e=>{
+  const w = e.target.closest("[data-ticker]");
+  if(w) selectTicker(w.dataset.ticker);
+});
+document.getElementById("viewSeg").querySelectorAll("button").forEach(b=>{
+  b.onclick = ()=>{ state.view=b.dataset.view; b.parentElement.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); renderAll(); };
+});
+document.getElementById("sortSeg").querySelectorAll("button").forEach(b=>{
+  b.onclick = ()=>{ state.sort=b.dataset.sort; b.parentElement.querySelectorAll("button").forEach(x=>x.classList.toggle("active",x===b)); renderAll(); };
+});
+document.getElementById("search").addEventListener("input", e=>{ state.search=e.target.value.trim().toLowerCase(); renderAll(); });
+document.getElementById("markAll").onclick = markAllRead;
+document.getElementById("retryBtn").onclick = fetchNews;
+
+const themeBtn = document.getElementById("themeBtn");
+function setThemeIcon(){ themeBtn.innerHTML = document.documentElement.dataset.theme==="dark" ? ICONS.sun : ICONS.moon; }
+themeBtn.onclick = ()=>{
+  if(document.documentElement.dataset.theme==="dark") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.dataset.theme="dark";
+  setThemeIcon();
+};
+
+// ── 啟動 ──
+setThemeIcon();
+fetchNews();
+</script>
+</body>
+</html>
