@@ -115,9 +115,13 @@ input{font:inherit}
 .row .meta .sep{opacity:.5}
 /* ── topic cluster ── */
 .topic-cluster{margin:6px 0 2px;padding:4px 0;border-left:2px solid var(--hair);padding-left:10px}
-.topic-head{display:flex;align-items:baseline;gap:8px;padding:4px 0 6px;font-size:12px}
-.topic-label{color:var(--ink);font-weight:500;font-family:var(--sans)}
-.topic-meta{color:var(--dim);font-family:var(--mono);font-size:10.5px}
+.topic-cluster .topic-head{display:flex;align-items:baseline;gap:8px;padding:4px 0 6px;font-size:12px;cursor:pointer;user-select:none;border-radius:6px;transition:background .12s}
+.topic-cluster .topic-head:hover{background:var(--hover)}
+.topic-cluster .topic-head .toggle{font-family:var(--mono);font-size:10px;color:var(--dim);min-width:12px;transition:transform .2s}
+.topic-cluster.collapsed .topic-head .toggle{transform:rotate(-90deg)}
+.topic-cluster.collapsed .row{display:none}
+.topic-cluster .topic-label{color:var(--ink);font-weight:500;font-family:var(--sans)}
+.topic-cluster .topic-meta{color:var(--dim);font-family:var(--mono);font-size:10.5px;margin-left:auto}
 /* ── chip ── */
 .star{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .15s,color .15s,transform .15s}
 .star:hover{background:var(--hover);color:var(--signal)}
@@ -484,11 +488,15 @@ function render(){
         if(cl.rows.length === 1){
           return rowHTML(cl.rows[0]);
         }
-        // 多篇同主題 → 收攏區塊
+        // 多篇同主題 → 收攏區塊（預設收合）
         const nm = TICKER_NAMES[cl.ticker]||cl.ticker;
         const unread = cl.rows.filter(r=>!r.read).length;
-        return `<div class="topic-cluster">
-          <div class="topic-head"><span class="topic-label">📰 ${esc(cl.topic)}</span><span class="topic-meta">${nm}${cl.ticker} · ${unread}/${cl.rows.length} 則</span></div>
+        return `<div class="topic-cluster collapsed">
+          <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
+            <span class="toggle">▼</span>
+            <span class="topic-label">${esc(cl.topic)}</span>
+            <span class="topic-meta">${nm}${cl.ticker} · ${unread}/${cl.rows.length} 則</span>
+          </div>
           ${cl.rows.map(rowHTML).join("")}
         </div>`;
       }).join("");
