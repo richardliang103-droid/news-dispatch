@@ -125,7 +125,8 @@ input{font:inherit}
 .topic-cluster .topic-head:hover{background:var(--hover)}
 .topic-cluster .topic-head .toggle{font-family:var(--mono);font-size:10px;color:var(--dim);min-width:12px;transition:transform .2s}
 .topic-cluster.collapsed .topic-head .toggle{transform:rotate(-90deg)}
-.topic-cluster.collapsed .row{display:none}
+.topic-cluster.collapsed > .row,
+.topic-cluster.collapsed > .topic-cluster{display:none}
 .topic-cluster .topic-label{color:var(--ink);font-weight:500;font-family:var(--sans)}
 .topic-cluster .topic-meta{color:var(--dim);font-family:var(--mono);font-size:10.5px;margin-left:auto}
 /* ── chip ── */
@@ -427,6 +428,151 @@ function groupByTheme(articles){
   result.sort((a,b) => b.rows.length - a.rows.length);
   return result;
 }
+// ── 事件分群 ──
+const EVENT_DICT = {
+  "衝突":     { words: ["肢體衝突","互毆","痛毆","毆打","打人","衝突","董座","高層","警方","警","逮捕","董事長","打架","鬥毆","拉扯","股東會","爆發","爭執","糾紛","對質","爭吵"], label: "衝突" },
+  "配息":     { words: ["配息","股利","除息","殖利率","股息"], label: "配息" },
+  "財報":     { words: ["獲利","EPS","淨利","法說","財報","營收"], label: "財報" },
+  "法人籌碼": { words: ["外資","買超","賣超","投信","自營商","籌碼","大戶"], label: "法人籌碼" },
+  "重大訊息": { words: ["重訊","子公司","處分","取得","公告","董事會決議"], label: "重大訊息" },
+};
+function normalizeTitle(t){
+  return t
+    .replace(/[（(][^)）]*[)）]/g,'')
+    .replace(/[【\[][^\]】]*[\]】]/g,'')
+    .replace(/[─–—\-・•·。，,！!？?　\s]+/g,' ')
+    .replace(/[^a-zA-Z0-9\u4e00-\u9fff ]/g,'')
+    .trim();
+}
+function eventCategories(title){
+  const cats = [];
+  for(const [cat, info] of Object.entries(EVENT_DICT)){
+    for(const w of info.words){ if(title.includes(w)){ cats.push(cat); break; } }
+  }
+  return cats;
+}
+function findContextWords(titles){
+  const ctx = [];
+  const contextChecks = [
+    { words:["高層"], label:"高層" },
+    { words:["董座","董事長"], label:"董座" },
+    { words:["警方","警察","警員"], label:"警方到場" },
+    { words:["股東會","股東大會","股臨會"], label:"股東會" },
+  ];
+  for(const c of contextChecks){
+    for(const t of titles){
+      for(const w of c.words){ if(t.includes(w)){ ctx.push(c.label); break; } }
+      if(ctx[ctx.length-1] === c.label) break;
+    }
+  }
+  return ctx;
+}
+function eventLabel(rows){
+  const cats = rows.map(r=>eventCategories(r.title)).flat();
+  const freq = {};
+  for(const c of cats) freq[c] = (freq[c]||0) + 1;
+  let bestCat="", bestCount=0;
+  for(const [c,n] of Object.entries(freq)){ if(n>bestCount){ bestCount=n; bestCat=c; } }
+  if(bestCat){
+    const name = TICKER_NAMES[rows[0].ticker] || rows[0].ticker;
+    const titles = rows.map(r=>r.title);
+    const ctx = findContextWords(titles);
+    const ctxStr = ctx.length > 0 ? ctx.join("") : "";
+    return name + ctxStr + EVENT_DICT[bestCat].label;
+  }
+  // fallback: find shortest meaningful title segment
+  let shortest = rows[0].title;
+  for(const r of rows){
+    if(r.title.length < shortest.length) shortest = r.title;
+  }
+  return shortest.length > 24 ? shortest.substring(0,24)+"…" : shortest;
+}
+function ngrams(s, n){
+  const r = [];
+  for(let i=0;i<=s.length-n;i++) r.push(s.substring(i,i+n));
+  return r;
+}
+function jaccard(a,b){
+  const sa=new Set(a), sb=new Set(b);
+  let inter=0;
+  for(const x of sa) if(sb.has(x)) inter++;
+  const union = new Set([...sa,...sb]).size;
+  return union===0 ? 0 : inter/union;
+}
+function entityFromTitle(title, ticker){
+  // Extract entity names that appear in a title, using known ticker names
+  const entities = [];
+  const name = TICKER_NAMES[ticker];
+  if(name && title.includes(name)) entities.push(name);
+  // Also check for partial matches like "國泰" from "國泰金"
+  for(const [tk, nm] of Object.entries(TICKER_NAMES)){
+    if(nm.length>1 && title.includes(nm)) entities.push(nm);
+  }
+  return entities;
+}
+function groupByEvent(rows){
+  if(rows.length<=1) return [{eventRows:rows, eventLabel:eventLabel(rows)}];
+  const n=rows.length, assigned=Array(n).fill(false), clusters=[];
+  // Pass 1: same ticker + shared event category
+  for(let i=0;i<n;i++){
+    if(assigned[i]) continue;
+    const group=[rows[i]]; assigned[i]=true;
+    const ci=eventCategories(rows[i].title), ti=rows[i].ticker;
+    for(let j=i+1;j<n;j++){
+      if(assigned[j]) continue;
+      const cj=eventCategories(rows[j].title);
+      if(ti===rows[j].ticker && ci.length>0 && cj.length>0 && ci.some(c=>cj.includes(c))){
+        group.push(rows[j]); assigned[j]=true;
+      }
+    }
+    clusters.push({eventRows:group, eventLabel:eventLabel(group)});
+  }
+  // Pass 2: cross-ticker — same event category + entity name in title
+  for(let i=0;i<clusters.length;i++){
+    if(clusters[i].eventRows.length>1) continue; // already merged
+    const a = clusters[i].eventRows[0];
+    const ci = eventCategories(a.title);
+    if(ci.length===0) continue;
+    const ai = entityFromTitle(a.title, a.ticker);
+    if(ai.length===0) continue;
+    for(let k=0;k<clusters.length;k++){
+      if(k===i || clusters[k].eventRows.length===0) continue;
+      const bi = clusters[k].eventRows.some(br => {
+        const bc = eventCategories(br.title);
+        if(!bc.some(c=>ci.includes(c))) return false;
+        const be = entityFromTitle(br.title, br.ticker);
+        return be.some(e=>ai.includes(e));
+      });
+      if(bi){
+        for(const br of clusters[k].eventRows) clusters[i].eventRows.push(br);
+        clusters[k].eventRows = [];
+        break;
+      }
+    }
+  }
+  // Pass 3: n-gram Jaccard for remaining singletons — merge with any multi-row cluster
+  for(let i=0;i<clusters.length;i++){
+    if(clusters[i].eventRows.length>1) continue;
+    const a = clusters[i].eventRows[0];
+    const normA = normalizeTitle(a.title);
+    let merged = false;
+    for(let k=0;k<clusters.length && !merged;k++){
+      if(k===i || clusters[k].eventRows.length<2) continue;
+      for(const bRow of clusters[k].eventRows){
+        const normB = normalizeTitle(bRow.title);
+        const sim2 = jaccard(ngrams(normA,2), ngrams(normB,2));
+        const sim3 = jaccard(ngrams(normA,3), ngrams(normB,3));
+        if((sim2>0.4 && sim3>0.2) || sim3>0.35){
+          clusters[k].eventRows.push(a);
+          clusters[i].eventRows = [];
+          merged = true;
+          break;
+        }
+      }
+    }
+  }
+  return clusters.filter(c=>c.eventRows.length>0);
+}
 function rowHTML(r){
   const tag = state.sort==="time" ? `<span class="rtk">${TICKER_NAMES[r.ticker]||r.ticker}${r.ticker}</span>` : "";
   return `<article class="row ${r.read?"":"unread"} ${r.starred?"starred":""}" role="button" tabindex="0" data-id="${r.id}">
@@ -487,21 +633,34 @@ function render(){
     // 每個日期內做主題聚類（科技新聞跳過聚類，直接列出）
     wrap.innerHTML = dateGroups.map(dg => {
       const clusters = state.category === "tech" 
-        ? dg.rows.map(r => ({ticker:r.ticker, topic:"", rows:[r]}))  // 科技新聞不聚類
+        ? dg.rows.map(r => ({ticker:r.ticker, topic:"", rows:[r], tickerString:""}))  // 科技新聞不聚類
         : groupByTheme(dg.rows);
       const clusterHTML = clusters.map(cl => {
         if(cl.rows.length === 1){
           return rowHTML(cl.rows[0]);
         }
-        // 多篇同主題 → 收攏區塊（預設收合）
+        // 多篇同主題 → 內部再做事件分群
+        const eventClusters = groupByEvent(cl.rows);
+        const eventHTML = eventClusters.map(ec => {
+          if(ec.eventRows.length === 1) return rowHTML(ec.eventRows[0]);
+          const unread = ec.eventRows.filter(r=>!r.read).length;
+          return `<div class="topic-cluster collapsed">
+            <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
+              <span class="toggle">▼</span>
+              <span class="topic-label">${esc(ec.eventLabel)}</span>
+              <span class="topic-meta">${unread}/${ec.eventRows.length} 則</span>
+            </div>
+            ${ec.eventRows.map(rowHTML).join("")}
+          </div>`;
+        }).join("");
         const unread = cl.rows.filter(r=>!r.read).length;
-        return `<div class="topic-cluster collapsed">
+        return `<div class="topic-cluster">
           <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
             <span class="toggle">▼</span>
             <span class="topic-label">${esc(cl.topic)}</span>
             <span class="topic-meta">${cl.tickerString || ''} · ${unread}/${cl.rows.length} 則</span>
           </div>
-          ${cl.rows.map(rowHTML).join("")}
+          ${eventHTML}
         </div>`;
       }).join("");
       return `<section class="group">
