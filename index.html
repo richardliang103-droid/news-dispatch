@@ -13,6 +13,7 @@
   --border:#E7E2D8; --hair:#EEEAE1;
   --ink:#211C16; --muted:#79716A; --dim:#ABA39A;
   --signal:#B8860B; --signal-soft:rgba(184,134,11,.13); --signal-line:rgba(184,134,11,.9);
+  --ticker-bg:rgba(29,78,216,.10); --ticker-name:#1D4ED8; --ticker-code:#7C2D12;
   --serif:"Newsreader","Noto Serif TC",Georgia,"Times New Roman",serif;
   --sans:-apple-system,system-ui,"Segoe UI","Noto Sans TC",sans-serif;
   --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -23,6 +24,7 @@ html[data-theme="dark"]{ /* warm lamplit dark */
   --border:#2C261E; --hair:#231E17;
   --ink:#ECE6DC; --muted:#9A9085; --dim:#5F574C;
   --signal:#E3A008; --signal-soft:rgba(227,160,8,.13); --signal-line:rgba(227,160,8,.92);
+  --ticker-bg:rgba(96,165,250,.14); --ticker-name:#93C5FD; --ticker-code:#FDBA74;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -117,7 +119,9 @@ input{font:inherit}
 .row.unread .title{color:var(--ink);font-weight:600}
 .row .meta{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:6px;font-family:var(--mono);font-size:11.5px;color:var(--dim);letter-spacing:.01em}
 .row.unread .meta{color:var(--muted)}
-.row .rtk{color:var(--ink);font-weight:500;padding-right:2px}
+.row .rtk{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:999px;background:var(--ticker-bg);border:1px solid color-mix(in srgb, var(--ticker-name) 22%, transparent);font-weight:600;letter-spacing:.02em}
+.row .rtk .rtk-name{color:var(--ticker-name);font-family:var(--sans);font-weight:700}
+.row .rtk .rtk-code{color:var(--ticker-code);font-family:var(--mono);font-weight:600;font-size:10.5px}
 .row .meta .sep{opacity:.5}
 /* ── topic cluster ── */
 .topic-cluster{margin:6px 0 2px;padding:4px 0;border-left:2px solid var(--hair);padding-left:10px}
@@ -129,6 +133,11 @@ input{font:inherit}
 .topic-cluster.collapsed > .topic-cluster{display:none}
 .topic-cluster .topic-label{color:var(--ink);font-weight:500;font-family:var(--sans)}
 .topic-cluster .topic-meta{color:var(--dim);font-family:var(--mono);font-size:10.5px;margin-left:auto}
+.ticker-cluster{border-left-color:color-mix(in srgb, var(--ticker-name) 35%, var(--hair));padding-left:10px}
+.ticker-cluster .topic-head{padding:8px 4px 9px}
+.ticker-cluster .topic-label{display:inline-flex;align-items:baseline;gap:5px}
+.ticker-cluster .topic-label .rtk-name{color:var(--ticker-name);font-weight:700}
+.ticker-cluster .topic-label .rtk-code{color:var(--ticker-code);font-family:var(--mono);font-size:11px}
 /* ── chip ── */
 .star{flex:0 0 auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--dim);transition:background .15s,color .15s,transform .15s}
 .star:hover{background:var(--hover);color:var(--signal)}
@@ -160,7 +169,9 @@ html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#
   .chip-tk{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1px solid var(--border);color:var(--muted);font-size:13px;white-space:nowrap}
   .chip-tk.active{background:var(--hover);color:var(--ink);border-color:transparent}
   .chip-tk.all{font-family:var(--sans)}
-  .chip-tk .tk{font-family:var(--mono);font-weight:500;color:var(--ink)}
+  .chip-tk .tk{font-family:var(--sans);font-weight:600;color:var(--ink)}
+  .chip-tk .code{font-family:var(--mono);font-size:10.5px;color:var(--dim);margin-left:-2px}
+  .chip-tk.all .code{display:none}
   .chip-tk .badge{min-width:18px;height:16px;padding:0 5px;border-radius:8px;background:var(--signal-soft);color:var(--signal);font-family:var(--mono);font-size:10.5px;display:inline-flex;align-items:center;justify-content:center}
   .feed-head{padding:0 16px;height:56px}
   .h-left h1{font-size:19px}
@@ -247,6 +258,29 @@ const TICKER_NAMES = {
   "2330":"台積電","2454":"聯發科","NVDA":"輝達","AAPL":"蘋果","AMD":"超微",
   "TECH":"科技",
 };
+const TICKER_PALETTE = [
+  {bg:"rgba(37,99,235,.11)", name:"#2563EB", code:"#9A3412"},
+  {bg:"rgba(5,150,105,.12)", name:"#047857", code:"#B45309"},
+  {bg:"rgba(217,119,6,.13)", name:"#B45309", code:"#1D4ED8"},
+  {bg:"rgba(190,24,93,.11)", name:"#BE185D", code:"#047857"},
+  {bg:"rgba(14,116,144,.12)", name:"#0E7490", code:"#A16207"},
+  {bg:"rgba(124,58,237,.10)", name:"#6D28D9", code:"#0F766E"},
+  {bg:"rgba(180,83,9,.12)", name:"#92400E", code:"#1E40AF"},
+];
+function tickerPalette(ticker){
+  const key = String(ticker || "");
+  let n = 0;
+  for(let i=0;i<key.length;i++) n = (n * 31 + key.charCodeAt(i)) >>> 0;
+  return TICKER_PALETTE[n % TICKER_PALETTE.length];
+}
+function tickerStyle(ticker){
+  const p = tickerPalette(ticker);
+  return `--ticker-bg:${p.bg};--ticker-name:${p.name};--ticker-code:${p.code}`;
+}
+function tickerBadge(ticker){
+  const name = TICKER_NAMES[ticker] || ticker;
+  return `<span class="rtk" style="${tickerStyle(ticker)}"><span class="rtk-name">${esc(name)}</span><span class="rtk-code">${esc(ticker)}</span></span>`;
+}
 
 // ── Icon SVGs ──
 const ICONS = {
@@ -258,16 +292,19 @@ const ICONS = {
 // ── 時間輔助 ──
 function fmtTime(ts){
   if(!ts) return "";
+  const raw = String(ts);
+  const hasClock = /T\d{2}:\d{2}/.test(raw) || /\d{2}:\d{2}:\d{2}/.test(raw);
   const d = new Date(ts);
+  if(Number.isNaN(d.getTime())) return "";
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today - 86400000);
   const dm = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const day = dm.getTime() === today.getTime() ? "今日" : (dm.getTime() === yesterday.getTime() ? "昨" : `${d.getMonth()+1}/${d.getDate()}`);
+  if(!hasClock) return day;
   const hh = String(d.getHours()).padStart(2,'0');
   const mm = String(d.getMinutes()).padStart(2,'0');
-  if(dm.getTime() === today.getTime()) return `${hh}:${mm}`;
-  if(dm.getTime() === yesterday.getTime()) return `昨 ${hh}:${mm}`;
-  return `${d.getMonth()+1}/${d.getDate()}`;
+  return `${day} ${hh}:${mm}`;
 }
 
 // ── 從 Supabase 載入資料 ──
@@ -425,8 +462,10 @@ function renderRail(){
   const cb = items.map(it=>{
     const n = it.ticker==="all" ? totalUnread() : unreadOf(it.ticker);
     const cls = (it.ticker==="all"?"all ":"") + (it.ticker===state.ticker?"active":"");
+    const chipLabel = it.ticker==="all" ? "全部" : (it.name !== it.ticker ? it.name : it.ticker);
+    const chipCode = it.ticker!=="all" && it.name !== it.ticker ? `<span class="code">${it.ticker}</span>` : "";
     return `<button class="chip-tk ${cls}" data-ticker="${it.ticker}">
-      <span class="tk">${it.ticker==="all"?"全部":it.ticker}</span>
+      <span class="tk">${chipLabel}</span>${chipCode}
       <span class="badge ${n===0?"zero":""}">${n}</span></button>`;
   }).join("");
   document.getElementById("chipbar").innerHTML = cb;
@@ -453,7 +492,7 @@ function groupByTheme(articles){
 }
 // ── 事件分群 ──
 const EVENT_DICT = {
-  "衝突":     { words: ["肢體衝突","互毆","痛毆","毆打","打人","衝突","打架","鬥毆","拉扯","揮拳","全武行","械鬥","動手","打臉","口角"], label: "衝突" },
+  "衝突":     { words: ["肢體衝突","互毆","痛毆","毆打","打人","徒手攻擊","攻擊","爆爭執","爭執","衝突","打架","鬥毆","拉扯","揮拳","全武行","械鬥","動手","打臉","口角","警方"], label: "衝突" },
   "配息":     { words: ["配息","股利","除息","殖利率","股息"], label: "配息" },
   "財報":     { words: ["獲利","EPS","淨利","法說","財報","營收"], label: "財報" },
   "法人籌碼": { words: ["外資","買超","賣超","投信","自營商","籌碼","大戶"], label: "法人籌碼" },
@@ -620,11 +659,13 @@ function groupByOverlayWithFallback(rows){
   return result;
 }
 function rowHTML(r){
-  const tag = state.sort==="time" ? `<span class="rtk">${TICKER_NAMES[r.ticker]||r.ticker}${r.ticker}</span>` : "";
+  const meta = [tickerBadge(r.ticker), `<span>${esc(r.source)}</span>`];
+  if(r.time) meta.push(`<span class="sep">·</span><span>${esc(r.time)}</span>`);
+  meta.push(`<span class="chip">${esc(r.theme)}</span>`);
   return `<article class="row ${r.read?"":"unread"} ${r.starred?"starred":""}" role="button" tabindex="0" data-id="${r.id}">
     <div class="r-main">
       <div class="title">${esc(r.title)}</div>
-      <div class="meta">${tag}<span>${esc(r.source)}</span><span class="sep">·</span><span>${r.time}</span><span class="chip">${esc(r.theme)}</span></div>
+      <div class="meta">${meta.join("")}</div>
     </div>
     <button class="star" data-star="${r.id}" aria-label="收藏" title="收藏">${ICONS.star}</button>
   </article>`;
@@ -652,11 +693,15 @@ function render(){
   if(state.sort==="ticker"){
     const order = TICKERS.map(t=>t.ticker);
     wrap.innerHTML = order.filter(tk=>items.some(i=>i.ticker===tk)).map(tk=>{
-      const rows = items.filter(i=>i.ticker===tk);
+      const rows = items.filter(i=>i.ticker===tk).sort((a,b)=>b.ts-a.ts);
       const unread = rows.filter(r=>!r.read).length;
       const nm = TICKER_NAMES[tk] || tk;
-      return `<section class="group">
-        <div class="group-head"><span class="gtk">${nm}${tk}</span><span class="gline"></span><span class="gcount">${unread}/${rows.length}</span></div>
+      return `<section class="group topic-cluster ticker-cluster collapsed" style="${tickerStyle(tk)}">
+        <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
+          <span class="toggle">▼</span>
+          <span class="topic-label"><span class="rtk-name">${esc(nm)}</span><span class="rtk-code">${esc(tk)}</span></span>
+          <span class="topic-meta">${unread}/${rows.length} 則</span>
+        </div>
         ${rows.map(rowHTML).join("")}
       </section>`;
     }).join("");
