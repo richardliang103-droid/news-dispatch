@@ -1,28 +1,28 @@
 {
   "version": 1,
-  "generated_at": "2026-06-25T21:22:20.809588+08:00",
+  "generated_at": "2026-06-25T21:24:18.287884+08:00",
   "classified_by": "metis",
   "source": "supabase-news",
   "items": {
     "2017": {
-      "event_key": "2026-06-25-stock-其他重點-mega-financial-stock-surge",
-      "event_label": "兆豐金股價飆漲創26年新高",
-      "confidence": 0.85
+      "event_key": "2026-06-25-stock-其他重點-mega-fhc-stock-surge",
+      "event_label": "兆豐金股價飆漲創新高",
+      "confidence": 0.9
     },
     "2012": {
-      "event_key": "2026-06-25-stock-其他重點-mega-financial-stock-surge",
-      "event_label": "兆豐金股價飆漲創26年新高",
-      "confidence": 0.85
+      "event_key": "2026-06-25-stock-其他重點-mega-fhc-stock-surge",
+      "event_label": "兆豐金股價飆漲創新高",
+      "confidence": 0.9
     },
     "2060": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2075": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2026": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
@@ -37,7 +37,7 @@
     "2029": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2025": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
@@ -52,22 +52,22 @@
     "2072": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2087": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2070": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2024": {
       "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
       "event_label": "國泰高層肢體衝突",
-      "confidence": 0.95
+      "confidence": 0.9
     },
     "2014": {
       "event_key": "2026-06-24-stock-其他重點-ccp-esg-syndicated-loan",
@@ -87,6 +87,61 @@
     "2126": {
       "event_key": "2026-06-24-stock-其他重點-tsc-shiner-happy-workplace",
       "event_label": "台新新光金獲幸福企業獎",
+      "confidence": 0.9
+    },
+    "2043": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2021": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2023": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2048": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2049": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2050": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2051": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2052": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2053": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2054": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
+      "confidence": 0.9
+    },
+    "2086": {
+      "event_key": "2026-06-24-stock-其他重點-cathay-executive-conflict",
+      "event_label": "國泰高層肢體衝突",
       "confidence": 0.9
     }
   }
