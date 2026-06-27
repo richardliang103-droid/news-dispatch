@@ -58,6 +58,7 @@ function findContextWords(titles) {
 }
 
 function eventLabel(rows, tickerNames) {
+  if (!rows || rows.length === 0) return "";
   const cats = rows.map(r => eventCategories(r.title)).flat();
   const freq = {};
   for (const c of cats) freq[c] = (freq[c] || 0) + 1;
@@ -129,7 +130,7 @@ export function groupByEvent(rows, tickerNames) {
 
   // Pass 2: 跨 ticker — 相同事件類別 + 標題含相同實體名稱
   for (let i = 0; i < clusters.length; i++) {
-    if (clusters[i].eventRows.length > 1) continue;
+    if (clusters[i].eventRows.length !== 1) continue;
     const a = clusters[i].eventRows[0];
     const ci = eventCategories(a.title);
     if (ci.length === 0) continue;
@@ -153,7 +154,7 @@ export function groupByEvent(rows, tickerNames) {
 
   // Pass 3: n-gram Jaccard — 將單篇合併到既有多篇群組
   for (let i = 0; i < clusters.length; i++) {
-    if (clusters[i].eventRows.length > 1) continue;
+    if (clusters[i].eventRows.length !== 1) continue;
     const a = clusters[i].eventRows[0];
     const normA = normalizeTitle(a.title);
     let merged = false;
