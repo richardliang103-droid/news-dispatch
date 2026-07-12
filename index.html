@@ -101,6 +101,16 @@ input{font:inherit}
 .topic-summary{font-family:var(--sans);font-size:12px;color:var(--signal);font-weight:400;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-left:6px;opacity:.85}
 .topic-cluster.collapsed .topic-summary{opacity:.65}
 
+/* ---------- 每日摘要卡片（daily_digest） ---------- */
+.digest-card{display:flex;gap:10px;align-items:flex-start;margin:4px 8px 8px;padding:12px 14px;background:var(--signal-soft);border:1px solid color-mix(in srgb, var(--signal) 24%, transparent);border-radius:11px}
+.digest-card .digest-icon{color:var(--signal);font-size:14px;line-height:1.55;flex:0 0 auto}
+.digest-card .digest-body{min-width:0}
+.digest-card .digest-label{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);margin-bottom:4px}
+.digest-card .digest-text{font-family:var(--serif);font-size:14.5px;line-height:1.62;color:var(--ink);margin:0}
+.digest-card.top{margin:14px 8px 2px}
+/* ticker 分組收合時，摘要卡片仍顯示在標題列下方 */
+.ticker-cluster.collapsed > .digest-card{display:flex}
+
 /* ---------- skeleton ---------- */
 .skeleton{background:linear-gradient(90deg,var(--hair) 25%,var(--border) 50%,var(--hair) 75%);background-size:200% 100%;animation:shimmer 1.5s infinite;border-radius:6px}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}

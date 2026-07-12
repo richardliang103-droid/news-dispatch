@@ -79,6 +79,31 @@ export async function fetchNews(category) {
   }));
 }
 
+// ── 從 Supabase 載入每日摘要（daily_digest） ──
+// 取每個 ticker 最近 3 天內最新的一筆；沒有摘要的 ticker 不在 map 裡（前端不顯示）。
+export async function fetchDigests() {
+  try {
+    const since = new Date(Date.now() - 2 * 86400000);
+    const sinceStr = `${since.getFullYear()}-${String(since.getMonth() + 1).padStart(2, '0')}-${String(since.getDate()).padStart(2, '0')}`;
+    const { data, error } = await supabase
+      .from("daily_digest")
+      .select("ticker, digest_date, summary")
+      .gte("digest_date", sinceStr)
+      .order("digest_date", { ascending: false });
+
+    if (error) throw error;
+
+    const map = {};
+    for (const d of (data || [])) {
+      if (d.summary && !map[d.ticker]) map[d.ticker] = { summary: d.summary, date: d.digest_date };
+    }
+    return map;
+  } catch (e) {
+    console.warn("daily_digest 載入失敗（不影響新聞顯示）", e);
+    return {};
+  }
+}
+
 // ── 從 Supabase 載入事件分類（取代 events.json） ──
 export async function fetchEvents() {
   try {

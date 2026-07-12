@@ -1,4 +1,4 @@
-import { TICKER_NAMES, tickerStyle, fetchNews, fetchEvents, fetchEventsFallback,
+import { TICKER_NAMES, tickerStyle, fetchNews, fetchEvents, fetchEventsFallback, fetchDigests,
          setRead as dbSetRead, setStarred as dbSetStarred, markAllReadRemote,
          persistReadState, persistStarredState, applyLocalState } from "./db.js";
 import { groupByTheme, groupByOverlayWithFallback } from "./clustering.js";
@@ -14,6 +14,7 @@ const ICONS = {
 const state = { ticker: "all", view: "all", sort: "time", search: "", loading: true, error: false, category: "stock" };
 let DATA = [];
 let TICKERS = [];
+let DIGESTS = {}; // { ticker: { summary, date } } — 每日 AI 摘要
 let fuseInstance = null; // Fuse.js 實例
 
 // ── Fuse.js 模糊搜尋初始化 ──
@@ -82,6 +83,23 @@ function rowHTML(r) {
   </article>`;
 }
 
+// ── 每日摘要卡片 ──
+function digestCardHTML(tk, isTop = false) {
+  const d = DIGESTS[tk];
+  if (!d || !d.summary) return "";
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const dd = new Date(d.date + "T00:00:00");
+  const label = d.date === todayStr ? "今日摘要" : `${dd.getMonth() + 1}/${dd.getDate()} 摘要`;
+  return `<div class="digest-card${isTop ? " top" : ""}">
+    <span class="digest-icon">✦</span>
+    <div class="digest-body">
+      <span class="digest-label">${esc(label)}</span>
+      <p class="digest-text">${esc(d.summary)}</p>
+    </div>
+  </div>`;
+}
+
 // ── 使用 DocumentFragment 批次渲染 ──
 function renderToFragment(htmlFn) {
   const frag = document.createDocumentFragment();
@@ -119,18 +137,25 @@ function render() {
   const frag = document.createDocumentFragment();
   const container = document.createElement("div");
 
+  // 單一 ticker 篩選時，把該檔的每日摘要固定在最上方（各種排序皆同）
+  const topDigest = (state.category === "stock" && state.ticker !== "all" && !state.search)
+    ? digestCardHTML(state.ticker, true) : "";
+
   if (state.sort === "ticker") {
     const order = TICKERS.map(t => t.ticker);
-    container.innerHTML = order.filter(tk => items.some(i => i.ticker === tk)).map(tk => {
+    container.innerHTML = topDigest + order.filter(tk => items.some(i => i.ticker === tk)).map(tk => {
       const rows = items.filter(i => i.ticker === tk).sort((a, b) => b.ts - a.ts);
       const unread = rows.filter(r => !r.read).length;
       const nm = TICKER_NAMES[tk] || tk;
+      // ticker 分組標題列下方的每日摘要卡片（收合時也保持可見）
+      const digest = state.ticker === "all" ? digestCardHTML(tk) : "";
       return `<section class="group topic-cluster ticker-cluster collapsed" style="${tickerStyle(tk)}">
         <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
           <span class="toggle">▼</span>
           <span class="topic-label"><span class="rtk-name">${esc(nm)}</span><span class="rtk-code">${esc(tk)}</span></span>
           <span class="topic-meta">${unread}/${rows.length} 則</span>
         </div>
+        ${digest}
         ${rows.map(rowHTML).join("")}
       </section>`;
     }).join("");
@@ -151,7 +176,7 @@ function render() {
       dateGroups[dateGroups.length - 1].rows.push(r);
     }
 
-    container.innerHTML = dateGroups.map(dg => {
+    container.innerHTML = topDigest + dateGroups.map(dg => {
       const clusters = state.category === "tech"
         ? dg.rows.map(r => ({ ticker: r.ticker, topic: "", rows: [r], tickerString: "" }))
         : groupByTheme(dg.rows, TICKER_NAMES);
@@ -350,6 +375,9 @@ async function loadNews() {
   try {
     DATA = await fetchNews(state.category);
     applyLocalState(DATA);
+
+    // 每日 AI 摘要（僅股市類別；載入失敗回空物件，不影響新聞）
+    DIGESTS = state.category === "stock" ? await fetchDigests() : {};
 
     // 載入事件分類（優先 Supabase news_events 表，fallback 到 events.json）
     const eventsMap = await fetchEvents() || await fetchEventsFallback();
