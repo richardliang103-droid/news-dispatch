@@ -58,7 +58,8 @@ export async function fetchNews(category) {
   const srcType = category === "tech" ? "tech" : "stock";
   const { data, error } = await supabase
     .from("news")
-    .select("*")
+    // Select only fields rendered by the dashboard; avoid transferring unused columns.
+    .select("id,source_type,ticker,title,url,source,theme,published,read,starred")
     .eq("source_type", srcType)
     .order("published", { ascending: false })
     .limit(200);
