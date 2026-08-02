@@ -12,21 +12,25 @@ export const TICKER_NAMES = {
 };
 
 // ── Ticker 調色盤 ──
+// tickerStyle() 是 inline style，優先權蓋過 html[data-theme="dark"] 的 CSS 變數，
+// 深色模式如果沿用亮色系的 name/code 顏色，打在深色背景上對比會不足，
+// 所以每組色系各自準備 light/dark 兩份。
 export const TICKER_PALETTE = [
-  {bg:"rgba(37,99,235,.11)", name:"#2563EB", code:"#9A3412"},
-  {bg:"rgba(5,150,105,.12)", name:"#047857", code:"#B45309"},
-  {bg:"rgba(217,119,6,.13)", name:"#B45309", code:"#1D4ED8"},
-  {bg:"rgba(190,24,93,.11)", name:"#BE185D", code:"#047857"},
-  {bg:"rgba(14,116,144,.12)", name:"#0E7490", code:"#A16207"},
-  {bg:"rgba(124,58,237,.10)", name:"#6D28D9", code:"#0F766E"},
-  {bg:"rgba(180,83,9,.12)", name:"#92400E", code:"#1E40AF"},
+  { light:{bg:"rgba(37,99,235,.11)",  name:"#2563EB", code:"#9A3412"}, dark:{bg:"rgba(96,165,250,.16)",  name:"#93C5FD", code:"#FDBA74"} },
+  { light:{bg:"rgba(5,150,105,.12)",  name:"#047857", code:"#B45309"}, dark:{bg:"rgba(52,211,153,.16)",  name:"#6EE7B7", code:"#FCD34D"} },
+  { light:{bg:"rgba(217,119,6,.13)",  name:"#B45309", code:"#1D4ED8"}, dark:{bg:"rgba(251,191,36,.16)",  name:"#FCD34D", code:"#93C5FD"} },
+  { light:{bg:"rgba(190,24,93,.11)",  name:"#BE185D", code:"#047857"}, dark:{bg:"rgba(244,114,182,.16)", name:"#F9A8D4", code:"#6EE7B7"} },
+  { light:{bg:"rgba(14,116,144,.12)", name:"#0E7490", code:"#A16207"}, dark:{bg:"rgba(34,211,238,.16)",  name:"#67E8F9", code:"#FDE047"} },
+  { light:{bg:"rgba(124,58,237,.10)", name:"#6D28D9", code:"#0F766E"}, dark:{bg:"rgba(167,139,250,.16)", name:"#C4B5FD", code:"#5EEAD4"} },
+  { light:{bg:"rgba(180,83,9,.12)",   name:"#92400E", code:"#1E40AF"}, dark:{bg:"rgba(251,146,60,.16)",  name:"#FDBA74", code:"#93C5FD"} },
 ];
 
 export function tickerPalette(ticker) {
   const key = String(ticker || "");
   let n = 0;
   for (let i = 0; i < key.length; i++) n = (n * 31 + key.charCodeAt(i)) >>> 0;
-  return TICKER_PALETTE[n % TICKER_PALETTE.length];
+  const pair = TICKER_PALETTE[n % TICKER_PALETTE.length];
+  return document.documentElement.dataset.theme === "dark" ? pair.dark : pair.light;
 }
 
 export function tickerStyle(ticker) {
@@ -218,4 +222,16 @@ export function applyLocalState(data) {
     if (readIds.has(k)) d.read = true;
     if (starIds.has(k)) d.starred = true;
   });
+}
+
+// 把已經不在目前抓取範圍（近 200 則）內的已讀 id 修剪掉，避免 localStorage 無限成長。
+// 收藏 id 刻意不修剪：使用者主動收藏的文章即使掉出抓取範圍，仍要維持已收藏狀態。
+export function pruneReadState(data) {
+  const validIds = new Set(data.map(d => String(d.id)));
+  const ids = storedIdSet(LS_READ);
+  let changed = false;
+  for (const id of ids) {
+    if (!validIds.has(id)) { ids.delete(id); changed = true; }
+  }
+  if (changed) writeIdSet(LS_READ, ids);
 }
