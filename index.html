@@ -3,9 +3,25 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+// 在首次繪製前套用已儲存的主題，避免深色模式使用者先閃一下淺色版面。
+// key（"ns-theme"）與 js/ui.js 的 saveThemePreference() 手動保持一致 —
+// 這裡刻意用同步 inline script、不走 ES module，import 是 deferred 的，會晚一步造成閃爍。
+(function () {
+  try {
+    var saved = localStorage.getItem("ns-theme");
+    var dark = saved ? saved === "dark" : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+    if (dark) document.documentElement.dataset.theme = "dark";
+  } catch (e) {}
+})();
+</script>
 <title>晨報 · 個人股市新聞</title>
 <link rel="icon" href="favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#B8860B">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="晨報">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500;6..72,600&family=Noto+Sans+TC:wght@400;500&family=Noto+Serif+TC:wght@500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -256,13 +272,7 @@ html[data-theme="dark"] .err-banner{background:#2A1010;border-color:#633;color:#
   </main>
 </div>
 
-<!-- ES Module 入口 — Fuse.js 作為全域暴露，Supabase 作為 UMD -->
-<script type="module">
-  // Fuse.js 的 ESM 模組不會自動掛到 window，手動掛載供 ui.js 使用
-  import Fuse from "https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.mjs";
-  window.Fuse = Fuse;
-  // 載入主應用模組
-  import("./js/ui.js");
-</script>
+<!-- ES Module 入口（Fuse.js 由 ui.js 自行 import；Supabase 仍用官方建議的 UMD CDN tag） -->
+<script type="module" src="./js/ui.js"></script>
 </body>
 </html>

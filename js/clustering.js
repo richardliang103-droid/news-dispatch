@@ -84,6 +84,7 @@ function entityFromTitle(title, ticker, tickerNames) {
   const name = tickerNames[ticker];
   if (name && title.includes(name)) entities.push(name);
   for (const [tk, nm] of Object.entries(tickerNames)) {
+    if (tk === "TECH") continue; // "科技" 是泛用詞，當實體比對會讓不相關新聞被誤併成同一事件
     if (nm.length > 1 && title.includes(nm)) entities.push(nm);
   }
   return entities;

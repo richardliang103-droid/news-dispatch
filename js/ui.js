@@ -1,6 +1,7 @@
+import Fuse from "https://cdn.jsdelivr.net/npm/fuse.js@7.0.0/dist/fuse.min.mjs";
 import { TICKER_NAMES, tickerStyle, fetchNews, fetchEvents, fetchEventsFallback, fetchDigests,
          setRead as dbSetRead, setStarred as dbSetStarred, markAllReadRemote,
-         persistReadState, persistStarredState, applyLocalState } from "./db.js";
+         persistReadState, persistStarredState, applyLocalState, pruneReadState } from "./db.js";
 import { groupByTheme, groupByOverlayWithFallback } from "./clustering.js";
 
 // ── Icon SVGs ──
@@ -20,10 +21,6 @@ let fuseInstance = null; // Fuse.js 實例
 // ── Fuse.js 模糊搜尋初始化 ──
 // 索引固定為「完整 DATA」，絕不用過濾後的子集重建，避免搜尋結果隨輸入單調收斂、無法復原。
 function initFuse() {
-  if (typeof Fuse === "undefined") {
-    console.warn("Fuse.js 未載入，降級為 substring 搜尋");
-    return;
-  }
   const enriched = DATA.map(r => ({ ...r, tickerName: TICKER_NAMES[r.ticker] || "" }));
   fuseInstance = new Fuse(enriched, {
     keys: [
@@ -102,15 +99,6 @@ function digestCardHTML(tk, isTop = false) {
   </div>`;
 }
 
-// ── 使用 DocumentFragment 批次渲染 ──
-function renderToFragment(htmlFn) {
-  const frag = document.createDocumentFragment();
-  const tmp = document.createElement("div");
-  tmp.innerHTML = htmlFn();
-  while (tmp.firstChild) frag.appendChild(tmp.firstChild);
-  return frag;
-}
-
 // ── 主渲染 ──
 function render() {
   if (state.loading) return;
@@ -121,7 +109,7 @@ function render() {
 
   if (items.length === 0) {
     wrap.innerHTML = "";
-    let mk = "✓", big = "今天的新聞都看完了", small = "明早 07:30 會有新的一批";
+    let mk = "✓", big = "今天的新聞都看完了", small = "明早 07:50 會有新的一批";
     if (state.search) { mk = "⌕"; big = `找不到符合「${esc(state.search)}」的新聞`; small = "換個關鍵字試試"; }
     else if (state.view === "starred") { mk = "☆"; big = "還沒有收藏"; small = "點任一則右側的星號加入"; }
     empty.innerHTML = `<div class="mk">${mk}</div><div class="big">${big}</div><div class="small">${small}</div>`;
@@ -130,17 +118,14 @@ function render() {
   }
   empty.classList.remove("show");
 
-  // 使用 DocumentFragment 批次建構 DOM
-  const frag = document.createDocumentFragment();
-  const container = document.createElement("div");
-
   // 單一 ticker 篩選時，把該檔的每日摘要固定在最上方（各種排序皆同）
   const topDigest = (state.category === "stock" && state.ticker !== "all" && !state.search)
     ? digestCardHTML(state.ticker, true) : "";
 
+  let html;
   if (state.sort === "ticker") {
     const order = TICKERS.map(t => t.ticker);
-    container.innerHTML = topDigest + order.filter(tk => items.some(i => i.ticker === tk)).map(tk => {
+    html = topDigest + order.filter(tk => items.some(i => i.ticker === tk)).map(tk => {
       const rows = items.filter(i => i.ticker === tk).sort((a, b) => b.ts - a.ts);
       const unread = rows.filter(r => !r.read).length;
       const nm = TICKER_NAMES[tk] || tk;
@@ -173,7 +158,7 @@ function render() {
       dateGroups[dateGroups.length - 1].rows.push(r);
     }
 
-    container.innerHTML = topDigest + dateGroups.map(dg => {
+    html = topDigest + dateGroups.map(dg => {
       const clusters = state.category === "tech"
         ? dg.rows.map(r => ({ ticker: r.ticker, topic: "", rows: [r], tickerString: "" }))
         : groupByTheme(dg.rows, TICKER_NAMES);
@@ -219,9 +204,7 @@ function render() {
     }).join("");
   }
 
-  while (container.firstChild) frag.appendChild(container.firstChild);
-  wrap.innerHTML = "";
-  wrap.appendChild(frag);
+  wrap.innerHTML = html;
 }
 
 // ── Rail + mobile chips ──
@@ -251,12 +234,11 @@ function renderRail() {
 }
 
 function renderAll() {
-  renderRail();
   render();
   updateCounts();
 }
 
-// ── 計數更新 ──
+// ── 計數更新（含 rail/chip 徽章，兩者都要跟著已讀/收藏狀態變動）──
 function updateCounts() {
   renderRail();
   document.getElementById("cnt-unread").textContent = totalUnread();
@@ -380,10 +362,20 @@ function bindEvents() {
     };
   });
 
-  document.getElementById("search").addEventListener("input", e => {
-    state.search = e.target.value.trim().toLowerCase();
-    renderAll();
-  });
+  // debounce 150ms 避免每個鍵都全量重繪；組字（注音/拼音）過程中 input 事件不觸發搜尋，
+  // 等 compositionend 才算數，否則組字中的半成品字元會先跑一次無意義的搜尋。
+  const searchInput = document.getElementById("search");
+  let searchTimer = null, composing = false;
+  const applySearch = value => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      state.search = value.trim().toLowerCase();
+      renderAll();
+    }, 150);
+  };
+  searchInput.addEventListener("compositionstart", () => { composing = true; });
+  searchInput.addEventListener("compositionend", e => { composing = false; applySearch(e.target.value); });
+  searchInput.addEventListener("input", e => { if (!composing) applySearch(e.target.value); });
   document.getElementById("markAll").onclick = markAllRead;
   document.getElementById("retryBtn").onclick = loadNews;
 
@@ -395,25 +387,43 @@ function bindEvents() {
     if (document.documentElement.dataset.theme === "dark") document.documentElement.removeAttribute("data-theme");
     else document.documentElement.dataset.theme = "dark";
     setThemeIcon();
+    saveThemePreference();
+    // ticker 配色（inline style）依 data-theme 決定深淺兩組，切換後要重繪才會套用
+    if (!state.loading) renderAll();
   };
 }
 
+// ── 主題記憶（localStorage）──
+// index.html <head> 有一段同步 inline script 會在首次繪製前套用同一把 key，避免深色模式下先閃一下淺色。
+function saveThemePreference() {
+  try { localStorage.setItem("ns-theme", document.documentElement.dataset.theme === "dark" ? "dark" : "light"); }
+  catch (e) {}
+}
+
 // ── 主要載入流程 ──
+// loadSeq 防止快速切分類時，先發出但後回來的舊請求覆蓋掉新請求已渲染的畫面
+let loadSeq = 0;
 async function loadNews() {
+  const seq = ++loadSeq;
   state.loading = true;
   state.error = false;
   document.getElementById("errBanner").classList.remove("show");
   renderSkeleton();
 
   try {
-    DATA = await fetchNews(state.category);
+    // 三個查詢互不依賴，平行發出取代原本序列 await（首屏少兩次往返）
+    const [newsData, digests, eventsMap] = await Promise.all([
+      fetchNews(state.category),
+      state.category === "stock" ? fetchDigests() : Promise.resolve({}),
+      fetchEvents().then(m => m || fetchEventsFallback()),
+    ]);
+    if (seq !== loadSeq) return; // 已有更新的載入請求，這批結果作廢
+
+    DATA = newsData;
     applyLocalState(DATA);
+    pruneReadState(DATA);
+    DIGESTS = digests;
 
-    // 每日 AI 摘要（僅股市類別；載入失敗回空物件，不影響新聞）
-    DIGESTS = state.category === "stock" ? await fetchDigests() : {};
-
-    // 載入事件分類（優先 Supabase news_events 表，fallback 到 events.json）
-    const eventsMap = await fetchEvents() || await fetchEventsFallback();
     if (eventsMap) {
       for (const r of DATA) {
         const ev = eventsMap[String(r.id)];
@@ -451,6 +461,7 @@ async function loadNews() {
     state.loading = false;
     renderAll();
   } catch (e) {
+    if (seq !== loadSeq) return;
     console.error("Supabase fetch error:", e);
     state.loading = false;
     state.error = true;
