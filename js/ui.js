@@ -122,7 +122,7 @@ function render() {
   if (items.length === 0) {
     wrap.innerHTML = "";
     let mk = "✓", big = "今天的新聞都看完了", small = "明早 07:30 會有新的一批";
-    if (state.search) { mk = "⌕"; big = `找不到符合「${state.search}」的新聞`; small = "換個關鍵字試試"; }
+    if (state.search) { mk = "⌕"; big = `找不到符合「${esc(state.search)}」的新聞`; small = "換個關鍵字試試"; }
     else if (state.view === "starred") { mk = "☆"; big = "還沒有收藏"; small = "點任一則右側的星號加入"; }
     empty.innerHTML = `<div class="mk">${mk}</div><div class="big">${big}</div><div class="small">${small}</div>`;
     empty.classList.add("show");
@@ -282,7 +282,7 @@ function showEmpty(mk, big, small) {
 function openRow(el) {
   const r = DATA.find(d => d.id === +el.dataset.id);
   if (!r) return;
-  window.open(r.url, "_blank");
+  window.open(r.url, "_blank", "noopener,noreferrer");
   if (r.read) return;
   r.read = true;
   persistReadState(DATA);
