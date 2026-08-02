@@ -146,7 +146,7 @@ function render() {
       const nm = TICKER_NAMES[tk] || tk;
       // ticker 分組標題列下方的每日摘要卡片（收合時也保持可見）
       const digest = state.ticker === "all" ? digestCardHTML(tk) : "";
-      return `<section class="group topic-cluster ticker-cluster collapsed" style="${tickerStyle(tk)}">
+      return `<section class="group topic-cluster ticker-cluster collapsed" data-key="ticker:${esc(tk)}" style="${tickerStyle(tk)}">
         <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
           <span class="toggle">▼</span>
           <span class="topic-label"><span class="rtk-name">${esc(nm)}</span><span class="rtk-code">${esc(tk)}</span></span>
@@ -189,7 +189,8 @@ function render() {
           const summaryHTML = ec.summary
             ? `<span class="topic-summary">${esc(ec.summary)}</span>`
             : "";
-          return `<div class="topic-cluster collapsed">
+          const eventKey = ec.eventKey || ec.eventLabel;
+          return `<div class="topic-cluster collapsed" data-key="event:${esc(dg.label)}:${esc(cl.topic)}:${esc(eventKey)}">
             <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
               <span class="toggle">▼</span>
               <span class="topic-label">${esc(ec.eventLabel)}</span>
@@ -201,7 +202,7 @@ function render() {
         }).join("");
 
         const unread = cl.rows.filter(r => !r.read).length;
-        return `<div class="topic-cluster">
+        return `<div class="topic-cluster" data-key="theme:${esc(dg.label)}:${esc(cl.topic)}">
           <div class="topic-head" onclick="this.parentElement.classList.toggle('collapsed')">
             <span class="toggle">▼</span>
             <span class="topic-label">${esc(cl.topic)}</span>
@@ -278,6 +279,33 @@ function showEmpty(mk, big, small) {
   el.classList.add("show");
 }
 
+// ── 重繪時保留捲動位置與 cluster 展開狀態 ──
+// 單篇已讀/收藏不該讓使用者失去正在看的捲動位置、也不該把展開中的事件群收合回去；
+// 篩選條件變更（搜尋/排序/切標的）則維持原本「跳回頂部」的行為，不套用這層保留。
+function captureClusterStates() {
+  const map = {};
+  document.querySelectorAll(".topic-cluster[data-key]").forEach(el => {
+    map[el.dataset.key] = el.classList.contains("collapsed");
+  });
+  return map;
+}
+
+function restoreClusterStates(states) {
+  document.querySelectorAll(".topic-cluster[data-key]").forEach(el => {
+    const key = el.dataset.key;
+    if (key in states) el.classList.toggle("collapsed", states[key]);
+  });
+}
+
+function renderPreservingViewState(fn) {
+  const feedEl = document.querySelector(".feed");
+  const scrollTop = feedEl ? feedEl.scrollTop : 0;
+  const states = captureClusterStates();
+  fn();
+  restoreClusterStates(states);
+  if (feedEl) feedEl.scrollTop = scrollTop;
+}
+
 // ── 互動處理 ──
 function openRow(el) {
   const r = DATA.find(d => d.id === +el.dataset.id);
@@ -287,7 +315,7 @@ function openRow(el) {
   r.read = true;
   persistReadState(DATA);
   dbSetRead(r.id, true);
-  renderAll();
+  renderPreservingViewState(renderAll);
 }
 
 function toggleStar(id) {
@@ -296,7 +324,14 @@ function toggleStar(id) {
   r.starred = !r.starred;
   persistStarredState(DATA);
   dbSetStarred(id, r.starred);
-  renderAll();
+  renderPreservingViewState(renderAll);
+  const btn = document.querySelector(`[data-star="${id}"]`);
+  if (btn) {
+    btn.classList.add("spin");
+    const clearSpin = () => btn.classList.remove("spin");
+    btn.addEventListener("animationend", clearSpin, { once: true });
+    setTimeout(clearSpin, 400); // 防呆：animationend 極少數情況下不觸發也要清掉 class
+  }
 }
 
 function selectTicker(tk) { state.ticker = tk; renderAll(); }
@@ -307,7 +342,7 @@ async function markAllRead() {
   if (!ids.length) return;
   ids.forEach(id => { const r = DATA.find(d => d.id === id); if (r) r.read = true; });
   persistReadState(DATA);
-  renderAll();
+  renderPreservingViewState(renderAll);
   await markAllReadRemote(ids);
 }
 

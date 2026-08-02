@@ -191,7 +191,7 @@ export function groupByOverlayWithFallback(rows, tickerNames) {
       byKey[k].eventRows.push(r);
     }
     for (const [, g] of Object.entries(byKey)) {
-      result.push({ eventRows: g.eventRows, eventLabel: g.eventLabel, summary: g.summary, _overlay: true });
+      result.push({ eventRows: g.eventRows, eventLabel: g.eventLabel, summary: g.summary, eventKey: g.eventKey, _overlay: true });
     }
   }
 
