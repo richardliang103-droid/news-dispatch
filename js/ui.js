@@ -18,12 +18,14 @@ let DIGESTS = {}; // { ticker: { summary, date } } — 每日 AI 摘要
 let fuseInstance = null; // Fuse.js 實例
 
 // ── Fuse.js 模糊搜尋初始化 ──
+// 索引固定為「完整 DATA」，絕不用過濾後的子集重建，避免搜尋結果隨輸入單調收斂、無法復原。
 function initFuse() {
   if (typeof Fuse === "undefined") {
     console.warn("Fuse.js 未載入，降級為 substring 搜尋");
     return;
   }
-  fuseInstance = new Fuse(DATA, {
+  const enriched = DATA.map(r => ({ ...r, tickerName: TICKER_NAMES[r.ticker] || "" }));
+  fuseInstance = new Fuse(enriched, {
     keys: [
       { name: "title", weight: 2 },
       { name: "source", weight: 1 },
@@ -34,6 +36,12 @@ function initFuse() {
     distance: 100,
     minMatchCharLength: 1,
   });
+}
+
+// 每次過濾前只呼叫一次 Fuse.search（而非對每一列各呼叫一次），回傳命中 id 集合。
+function searchHitSet() {
+  if (!state.search || !fuseInstance) return null;
+  return new Set(fuseInstance.search(state.search).map(x => x.item.id));
 }
 
 // ── 輔助函數 ──
@@ -49,22 +57,16 @@ const unreadOf = t => DATA.filter(d => d.ticker === t && !d.read).length;
 const totalUnread = () => DATA.filter(d => !d.read).length;
 const totalStar = () => DATA.filter(d => d.starred).length;
 
-// ── 搜尋過濾 ──
-function matches(r) {
+// ── 搜尋過濾 ── hits 為 searchHitSet() 的結果，由呼叫端算好一次傳入
+function matches(r, hits) {
   if (state.ticker !== "all" && r.ticker !== state.ticker) return false;
   if (state.view === "unread" && r.read) return false;
   if (state.view === "starred" && !r.starred) return false;
   if (state.search) {
-    if (fuseInstance) {
-      // Fuse.js 模糊搜尋
-      const enriched = { ...r, tickerName: TICKER_NAMES[r.ticker] || "" };
-      const results = fuseInstance.search(state.search);
-      return results.some(result => result.item.id === r.id);
-    } else {
-      // 降級：substring
-      const hay = (r.title + " " + r.source + " " + r.ticker + " " + r.theme).toLowerCase();
-      if (!hay.includes(state.search)) return false;
-    }
+    if (hits) return hits.has(r.id);
+    // 降級：substring
+    const hay = (r.title + " " + r.source + " " + r.ticker + " " + r.theme).toLowerCase();
+    if (!hay.includes(state.search)) return false;
   }
   return true;
 }
@@ -114,13 +116,8 @@ function render() {
   if (state.loading) return;
   const wrap = document.getElementById("groups");
   const empty = document.getElementById("empty");
-  const items = DATA.filter(matches);
-
-  // 每次搜尋條件變更時重建 Fuse 索引（只索引當前過濾後的資料）
-  if (fuseInstance && state.search) {
-    const enriched = items.map(r => ({ ...r, tickerName: TICKER_NAMES[r.ticker] || "" }));
-    fuseInstance.setCollection(enriched);
-  }
+  const hits = searchHitSet();
+  const items = DATA.filter(r => matches(r, hits));
 
   if (items.length === 0) {
     wrap.innerHTML = "";
@@ -305,7 +302,8 @@ function toggleStar(id) {
 function selectTicker(tk) { state.ticker = tk; renderAll(); }
 
 async function markAllRead() {
-  const ids = DATA.filter(matches).map(r => r.id);
+  const hits = searchHitSet();
+  const ids = DATA.filter(r => matches(r, hits)).map(r => r.id);
   if (!ids.length) return;
   ids.forEach(id => { const r = DATA.find(d => d.id === id); if (r) r.read = true; });
   persistReadState(DATA);
